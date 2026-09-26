@@ -84,8 +84,15 @@ export default function RoomView({ roomId, roomKey }: Props) {
     return () => clearInterval(interval);
   }, [fetchRoom]);
 
+  const pendingKeys = useRef<Set<string>>(new Set());
+
   const sendAction = async (payload: Record<string, unknown>) => {
     if (!state) return;
+    // Guard against a double-click (or an impatient repeat click) firing the
+    // same action twice before the first request resolves.
+    const key = JSON.stringify(payload);
+    if (pendingKeys.current.has(key)) return;
+    pendingKeys.current.add(key);
     try {
       const res = await fetch(`/api/rooms/${roomId}/action`, {
         method: "POST",
@@ -100,6 +107,8 @@ export default function RoomView({ roomId, roomKey }: Props) {
       applyIncoming(data as RoomState);
     } catch {
       pushToast("That action didn't go through — check your connection.", "navy");
+    } finally {
+      pendingKeys.current.delete(key);
     }
   };
 

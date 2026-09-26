@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { AgreementItem, ItemStatus, SoftAskDecision } from "@/lib/types";
-import { isLocked, isDiverged, effectiveOwnerLabel, effectiveDueDate } from "@/lib/itemStatus";
+import { isLocked, isDiverged, hasProposal, effectiveOwnerLabel, effectiveDueDate } from "@/lib/itemStatus";
 import CategoryBadge from "./CategoryBadge";
 import StatusSeal from "./StatusSeal";
 
@@ -31,8 +31,10 @@ export default function ItemCard({
 }: Props) {
   const locked = isLocked(status);
   const diverged = isDiverged(status);
+  const proposed = hasProposal(status);
   const myConfirmed = viewingAs === "A" ? status.aConfirmed : status.bConfirmed;
   const myText = viewingAs === "A" ? status.aText : status.bText;
+  const proposerName = status.proposedBy === "A" ? orgA : status.proposedBy === "B" ? orgB : null;
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(myText);
 
@@ -71,14 +73,19 @@ export default function ItemCard({
         </div>
       </div>
 
-      <p className="mb-3 text-sm font-medium leading-relaxed text-navy">{item.text}</p>
+      <p className={`text-sm font-medium leading-relaxed text-navy ${locked && proposed ? "mb-1" : "mb-3"}`}>
+        {locked ? status.aText : item.text}
+      </p>
+      {locked && proposed && (
+        <p className="mb-3 text-[11px] font-medium uppercase tracking-wide text-gold-dark">
+          Resolved from ambiguity
+        </p>
+      )}
 
-      {diverged ? (
+      {diverged && (
         <div className="mb-3">
           <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-amber">
-            {item.category === "ambiguous" && !status.aConfirmed && !status.bConfirmed
-              ? "Two possible interpretations"
-              : "Mismatch — needs resolution"}
+            Two possible interpretations
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="rounded-lg bg-navy/[0.03] p-3">
@@ -91,7 +98,13 @@ export default function ItemCard({
             </div>
           </div>
         </div>
-      ) : null}
+      )}
+
+      {!diverged && !locked && proposed && proposerName && (
+        <div className="mb-3 rounded-lg bg-amber-bg px-3 py-2 text-xs text-amber">
+          Proposed by <span className="font-semibold">{proposerName}</span>
+        </div>
+      )}
 
       {item.category === "one_sided" && (
         <div className="mb-3 rounded-lg bg-slate-bg p-3 text-sm text-slate">
@@ -155,7 +168,7 @@ export default function ItemCard({
       {!locked && editing && (
         <div className="mt-3 border-t border-gold/20 pt-3">
           <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-navy/40">
-            Your version ({viewingAs === "A" ? orgA : orgB})
+            {diverged || proposed ? "Proposed wording" : `Your version (${viewingAs === "A" ? orgA : orgB})`}
           </label>
           <textarea
             value={draft}
@@ -185,7 +198,21 @@ export default function ItemCard({
         </div>
       )}
 
-      {!locked && !editing && (
+      {!locked && !editing && diverged && (
+        <div className="mt-3 border-t border-gold/20 pt-3">
+          <button
+            onClick={() => {
+              setDraft(myText);
+              setEditing(true);
+            }}
+            className="rounded-full bg-navy px-4 py-1.5 text-xs font-semibold text-white hover:bg-navy-light"
+          >
+            Propose clarification
+          </button>
+        </div>
+      )}
+
+      {!locked && !editing && !diverged && (
         <div className="mt-3 flex gap-2 border-t border-gold/20 pt-3">
           <button
             onClick={onConfirm}
@@ -205,7 +232,7 @@ export default function ItemCard({
             }}
             className="rounded-full border border-navy/15 px-4 py-1.5 text-xs font-semibold text-navy/70 hover:bg-navy/5"
           >
-            Edit
+            {proposed ? "Propose a different clarification" : "Edit"}
           </button>
         </div>
       )}

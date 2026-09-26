@@ -34,6 +34,8 @@ export interface ItemStatus {
   /** Epoch ms when each side last signed; cleared when that side's text is edited. */
   aSignedAt?: number | null;
   bSignedAt?: number | null;
+  /** Set once either side has proposed a single clarified version of a divergent item. */
+  proposedBy?: Side | null;
 }
 
 export interface BriefResult {

@@ -2,7 +2,14 @@
 
 import { useState } from "react";
 import { AgreementItem, ItemStatus, Side, SoftAskDecision } from "@/lib/types";
-import { isLocked, isDiverged, effectiveOwnerLabel, effectiveDueDate, signedAtFor } from "@/lib/itemStatus";
+import {
+  isLocked,
+  isDiverged,
+  hasProposal,
+  effectiveOwnerLabel,
+  effectiveDueDate,
+  signedAtFor,
+} from "@/lib/itemStatus";
 import { formatClockTime } from "@/lib/format";
 import CategoryBadge from "../CategoryBadge";
 
@@ -58,9 +65,11 @@ export default function RoomItemCard({
 }: Props) {
   const locked = isLocked(status);
   const diverged = isDiverged(status);
+  const proposed = hasProposal(status);
   const myOrgName = mySide === "A" ? orgA : orgB;
   const myConfirmed = mySide === "A" ? status.aConfirmed : status.bConfirmed;
   const myText = mySide === "A" ? status.aText : status.bText;
+  const proposerName = status.proposedBy === "A" ? orgA : status.proposedBy === "B" ? orgB : null;
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(myText);
 
@@ -95,19 +104,24 @@ export default function RoomItemCard({
         <CategoryBadge category={item.category} />
       </div>
 
-      <p className="mb-3 text-sm font-medium leading-relaxed text-navy">{item.text}</p>
+      <p className={`text-sm font-medium leading-relaxed text-navy ${locked && proposed ? "mb-1" : "mb-3"}`}>
+        {locked ? status.aText : item.text}
+      </p>
+      {locked && proposed && (
+        <p className="mb-3 text-[11px] font-medium uppercase tracking-wide text-gold-dark">
+          Resolved from ambiguity
+        </p>
+      )}
 
       <div className="mb-3 flex flex-wrap gap-x-5 gap-y-1.5 rounded-lg bg-navy/[0.03] px-3 py-2">
         <SignedSeal orgName={orgA} signedAt={signedAtFor(status, "A")} accent="navy" />
         <SignedSeal orgName={orgB} signedAt={signedAtFor(status, "B")} accent="gold" />
       </div>
 
-      {diverged ? (
+      {diverged && (
         <div className="mb-3">
           <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-amber">
-            {item.category === "ambiguous" && !status.aConfirmed && !status.bConfirmed
-              ? "Two possible interpretations"
-              : "Mismatch — needs resolution"}
+            Two possible interpretations
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="rounded-lg bg-navy/[0.03] p-3">
@@ -120,7 +134,13 @@ export default function RoomItemCard({
             </div>
           </div>
         </div>
-      ) : null}
+      )}
+
+      {!diverged && !locked && proposed && proposerName && (
+        <div className="mb-3 rounded-lg bg-amber-bg px-3 py-2 text-xs text-amber">
+          Proposed by <span className="font-semibold">{proposerName}</span>
+        </div>
+      )}
 
       {item.category === "one_sided" && (
         <div className="mb-3 rounded-lg bg-slate-bg p-3 text-sm text-slate">
@@ -184,7 +204,7 @@ export default function RoomItemCard({
       {!locked && editing && (
         <div className="mt-3 border-t border-gold/20 pt-3">
           <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-navy/40">
-            Your version ({myOrgName})
+            {diverged || proposed ? "Proposed wording" : `Your version (${myOrgName})`}
           </label>
           <textarea
             value={draft}
@@ -214,7 +234,21 @@ export default function RoomItemCard({
         </div>
       )}
 
-      {!locked && !editing && (
+      {!locked && !editing && diverged && (
+        <div className="mt-3 border-t border-gold/20 pt-3">
+          <button
+            onClick={() => {
+              setDraft(myText);
+              setEditing(true);
+            }}
+            className="rounded-full bg-navy px-4 py-1.5 text-xs font-semibold text-white hover:bg-navy-light"
+          >
+            Propose clarification
+          </button>
+        </div>
+      )}
+
+      {!locked && !editing && !diverged && (
         <div className="mt-3 flex gap-2 border-t border-gold/20 pt-3">
           <button
             onClick={onConfirm}
@@ -234,7 +268,7 @@ export default function RoomItemCard({
             }}
             className="rounded-full border border-navy/15 px-4 py-1.5 text-xs font-semibold text-navy/70 hover:bg-navy/5"
           >
-            Edit
+            {proposed ? "Propose a different clarification" : "Edit"}
           </button>
         </div>
       )}
