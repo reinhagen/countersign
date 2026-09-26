@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AgreementItem, ItemStatus, SoftAskDecision } from "@/lib/types";
 import {
   initialStatusFor,
@@ -12,13 +12,15 @@ import {
 } from "@/lib/itemStatus";
 import type { BriefCommitment } from "@/lib/fallback";
 import CallIntake from "./CallIntake";
+import CreateRoomScreen from "./CreateRoomScreen";
+import InvitePanel from "./InvitePanel";
 import AgreementBoard from "./AgreementBoard";
 import CommitmentsView from "./CommitmentsView";
 import WorkspaceHeader from "./WorkspaceHeader";
 import TeamBrief from "./TeamBrief";
 import ToastStack, { ToastMessage } from "./Toast";
 
-type Step = "call" | "workspace" | "brief";
+type Step = "call" | "create-room" | "invite" | "workspace" | "brief";
 type WorkspaceTab = "board" | "commitments";
 
 export default function App() {
@@ -34,9 +36,20 @@ export default function App() {
   const [briefLoading, setBriefLoading] = useState(false);
   const [brief, setBrief] = useState("");
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const [roomsEnabled, setRoomsEnabled] = useState(false);
+  const [creatingRoom, setCreatingRoom] = useState(false);
+  const [roomError, setRoomError] = useState<string | null>(null);
+  const [roomLinks, setRoomLinks] = useState<{ linkA: string; linkB: string } | null>(null);
 
   const effectiveOrgA = orgA || "Side A";
   const effectiveOrgB = orgB || "Side B";
+
+  useEffect(() => {
+    fetch("/api/config")
+      .then((res) => res.json())
+      .then((data) => setRoomsEnabled(Boolean(data.roomsEnabled)))
+      .catch(() => setRoomsEnabled(false));
+  }, []);
 
   const pushToast = (text: string, tone: "navy" | "gold" = "navy") => {
     const id = Date.now() + Math.random();
@@ -78,11 +91,47 @@ export default function App() {
       }
       setStatuses(initialStatuses);
       setWorkspaceTab("board");
-      setStep("workspace");
+      setStep(roomsEnabled ? "create-room" : "workspace");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong. Please try again.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCreateRoom = async () => {
+    setCreatingRoom(true);
+    setRoomError(null);
+    try {
+      const initialStatuses: Record<string, ItemStatus> = {};
+      for (const item of items) {
+        initialStatuses[item.id] = initialStatusFor(item);
+      }
+      const res = await fetch("/api/rooms", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orgA: effectiveOrgA,
+          orgB: effectiveOrgB,
+          transcript: "",
+          items,
+          statuses: initialStatuses,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.id) {
+        throw new Error(data.error || "Could not create the room.");
+      }
+      const origin = window.location.origin;
+      setRoomLinks({
+        linkA: `${origin}/room/${data.id}?key=${data.tokenA}`,
+        linkB: `${origin}/room/${data.id}?key=${data.tokenB}`,
+      });
+      setStep("invite");
+    } catch (e) {
+      setRoomError(e instanceof Error ? e.message : "Could not create the room. Please try again.");
+    } finally {
+      setCreatingRoom(false);
     }
   };
 
@@ -202,6 +251,35 @@ export default function App() {
     );
   }
 
+  if (step === "create-room") {
+    return (
+      <CreateRoomScreen
+        orgA={effectiveOrgA}
+        orgB={effectiveOrgB}
+        itemCount={items.length}
+        creating={creatingRoom}
+        error={roomError}
+        onCreateRoom={handleCreateRoom}
+        onUseDemoMode={() => setStep("workspace")}
+        showDemoFallback={Boolean(roomError)}
+      />
+    );
+  }
+
+  if (step === "invite" && roomLinks) {
+    return (
+      <InvitePanel
+        orgA={effectiveOrgA}
+        orgB={effectiveOrgB}
+        linkA={roomLinks.linkA}
+        linkB={roomLinks.linkB}
+        onContinue={() => {
+          window.location.href = roomLinks.linkA;
+        }}
+      />
+    );
+  }
+
   if (step === "workspace") {
     const count = commitmentsCount(items, statuses, viewingAs, effectiveOrgA, effectiveOrgB);
     return (
@@ -215,6 +293,7 @@ export default function App() {
           onSetTab={setWorkspaceTab}
           commitmentsCount={count}
           onBack={() => setStep("call")}
+          demoMode={!roomsEnabled}
         />
         {workspaceTab === "board" ? (
           <AgreementBoard

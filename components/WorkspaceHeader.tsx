@@ -9,6 +9,7 @@ interface Props {
   onSetTab: (t: "board" | "commitments") => void;
   commitmentsCount: number;
   onBack: () => void;
+  demoMode?: boolean;
 }
 
 export default function WorkspaceHeader({
@@ -20,9 +21,15 @@ export default function WorkspaceHeader({
   onSetTab,
   commitmentsCount,
   onBack,
+  demoMode,
 }: Props) {
   return (
     <div className="mb-8">
+      {demoMode && (
+        <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-amber-border bg-amber-bg px-3 py-1 text-xs font-semibold uppercase tracking-wide text-amber">
+          Demo mode (both sides on one screen)
+        </div>
+      )}
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
           <button onClick={onBack} className="mb-2 text-xs font-medium text-navy/40 hover:text-navy/70">

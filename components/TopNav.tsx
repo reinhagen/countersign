@@ -10,7 +10,7 @@ function SealIcon() {
 
 export default function TopNav() {
   return (
-    <div className="border-b border-gold/25 bg-ivory">
+    <div className="no-print border-b border-gold/25 bg-ivory">
       <div className="mx-auto flex max-w-6xl items-center gap-2 px-6 py-4">
         <SealIcon />
         <span className="font-serif text-lg font-semibold tracking-wide text-navy">Countersign</span>
