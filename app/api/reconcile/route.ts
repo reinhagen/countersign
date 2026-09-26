@@ -22,7 +22,8 @@ Respond with ONLY a JSON array (no prose, no markdown fences). Each element must
   "side_b_version": string or null (Side B's phrasing/interpretation, same rules as above from Side B's perspective; null if not applicable),
   "owner": string or null (a named person or side responsible, if mentioned),
   "due_date": string or null (a date or deadline if one was mentioned),
-  "clarification_question": string or null (only for soft_ask items: the exact question being asked; null otherwise)
+  "clarification_question": string or null (only for soft_ask items: the exact question being asked; null otherwise),
+  "raised_by": "A" | "B" | null (only for soft_ask items: which side voiced the ask; null otherwise)
 }
 
 Be thorough: capture every commitment, ambiguity, one-sided offer, and open ask you can find. Do not invent information that is not present in the transcript.`;

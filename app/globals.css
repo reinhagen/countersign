@@ -7,6 +7,32 @@ html {
 }
 
 body {
-  background-color: #f7f6f2;
-  color: #0f172a;
+  background-color: #faf8f3;
+  color: #0b1f3a;
+}
+
+::selection {
+  background-color: rgba(184, 151, 90, 0.25);
+}
+
+.tracking-caps {
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+* {
+  transition-property: background-color, border-color, color, box-shadow, transform, opacity;
+  transition-duration: 200ms;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+input,
+textarea,
+button {
+  transition-duration: 150ms;
+}
+
+:focus-visible {
+  outline: 2px solid #b8975a;
+  outline-offset: 2px;
 }

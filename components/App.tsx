@@ -2,15 +2,28 @@
 
 import { useState } from "react";
 import { AgreementItem, ItemStatus, SoftAskDecision } from "@/lib/types";
-import { initialStatusFor } from "@/lib/itemStatus";
+import {
+  initialStatusFor,
+  isLocked,
+  otherSide,
+  commitmentsCount,
+  effectiveOwnerLabel,
+  effectiveDueDate,
+} from "@/lib/itemStatus";
+import type { BriefCommitment } from "@/lib/fallback";
 import CallIntake from "./CallIntake";
 import AgreementBoard from "./AgreementBoard";
+import CommitmentsView from "./CommitmentsView";
+import WorkspaceHeader from "./WorkspaceHeader";
 import TeamBrief from "./TeamBrief";
+import ToastStack, { ToastMessage } from "./Toast";
 
-type Step = "call" | "board" | "brief";
+type Step = "call" | "workspace" | "brief";
+type WorkspaceTab = "board" | "commitments";
 
 export default function App() {
   const [step, setStep] = useState<Step>("call");
+  const [workspaceTab, setWorkspaceTab] = useState<WorkspaceTab>("board");
   const [orgA, setOrgA] = useState("");
   const [orgB, setOrgB] = useState("");
   const [items, setItems] = useState<AgreementItem[]>([]);
@@ -20,6 +33,16 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [briefLoading, setBriefLoading] = useState(false);
   const [brief, setBrief] = useState("");
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+
+  const effectiveOrgA = orgA || "Side A";
+  const effectiveOrgB = orgB || "Side B";
+
+  const pushToast = (text: string, tone: "navy" | "gold" = "navy") => {
+    const id = Date.now() + Math.random();
+    setToasts((prev) => [...prev, { id, text, tone }]);
+    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 2600);
+  };
 
   const handleChangeOrg = (fields: { orgA?: string; orgB?: string }) => {
     if (fields.orgA !== undefined) setOrgA(fields.orgA);
@@ -38,8 +61,8 @@ export default function App() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          orgA: orgA || "Side A",
-          orgB: orgB || "Side B",
+          orgA: effectiveOrgA,
+          orgB: effectiveOrgB,
           transcript,
         }),
       });
@@ -54,7 +77,8 @@ export default function App() {
         initialStatuses[item.id] = initialStatusFor(item);
       }
       setStatuses(initialStatuses);
-      setStep("board");
+      setWorkspaceTab("board");
+      setStep("workspace");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong. Please try again.");
     } finally {
@@ -63,18 +87,19 @@ export default function App() {
   };
 
   const handleConfirm = (id: string) => {
-    setStatuses((prev) => {
-      const current = prev[id];
-      if (!current) return prev;
-      return {
-        ...prev,
-        [id]: {
-          ...current,
-          aConfirmed: viewingAs === "A" ? true : current.aConfirmed,
-          bConfirmed: viewingAs === "B" ? true : current.bConfirmed,
-        },
-      };
-    });
+    const current = statuses[id];
+    if (!current) return;
+    const next: ItemStatus = {
+      ...current,
+      aConfirmed: viewingAs === "A" ? true : current.aConfirmed,
+      bConfirmed: viewingAs === "B" ? true : current.bConfirmed,
+    };
+    setStatuses((prev) => ({ ...prev, [id]: next }));
+    if (isLocked(next)) {
+      pushToast("Countersigned — both sides have signed.", "gold");
+    } else {
+      pushToast(`Confirmed as ${viewingAs === "A" ? effectiveOrgA : effectiveOrgB}.`, "navy");
+    }
   };
 
   const handleSaveEdit = (id: string, newText: string) => {
@@ -95,11 +120,42 @@ export default function App() {
   };
 
   const handleSoftAskDecision = (id: string, decision: SoftAskDecision) => {
+    const item = items.find((i) => i.id === id);
     setStatuses((prev) => {
       const current = prev[id];
       if (!current) return prev;
-      return { ...prev, [id]: { ...current, softAskDecision: decision } };
+      const commitmentOwner = decision === "request" && item?.raised_by ? otherSide(item.raised_by) : null;
+      return { ...prev, [id]: { ...current, softAskDecision: decision, commitmentOwner } };
     });
+    if (decision === "request") pushToast("Marked as a commitment.", "navy");
+  };
+
+  const handleSetCommitmentDueDate = (id: string, dueDate: string) => {
+    setStatuses((prev) => {
+      const current = prev[id];
+      if (!current) return prev;
+      return { ...prev, [id]: { ...current, commitmentDueDate: dueDate || null } };
+    });
+  };
+
+  const handleToggleDone = (id: string) => {
+    setStatuses((prev) => {
+      const current = prev[id];
+      if (!current) return prev;
+      return { ...prev, [id]: { ...current, done: !current.done } };
+    });
+  };
+
+  const buildCommitments = (): BriefCommitment[] => {
+    const commitments: BriefCommitment[] = [];
+    for (const item of items) {
+      const status = statuses[item.id];
+      if (!status || !isLocked(status)) continue;
+      const ownerLabel = effectiveOwnerLabel(item, status, effectiveOrgA, effectiveOrgB);
+      if (!ownerLabel) continue;
+      commitments.push({ text: item.text, ownerLabel, dueDate: effectiveDueDate(item, status) });
+    }
+    return commitments;
   };
 
   const handleGenerateBrief = async () => {
@@ -112,7 +168,12 @@ export default function App() {
       const res = await fetch("/api/brief", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orgA: orgA || "Side A", orgB: orgB || "Side B", items: resolvedItems }),
+        body: JSON.stringify({
+          orgA: effectiveOrgA,
+          orgB: effectiveOrgB,
+          items: resolvedItems,
+          commitments: buildCommitments(),
+        }),
       });
       const data = await res.json();
       setBrief(data.brief || "");
@@ -127,37 +188,68 @@ export default function App() {
 
   if (step === "call") {
     return (
-      <CallIntake
-        orgA={orgA}
-        orgB={orgB}
-        loading={loading}
-        error={error}
-        onChangeOrg={handleChangeOrg}
-        onAnalyze={handleAnalyze}
-      />
+      <>
+        <CallIntake
+          orgA={orgA}
+          orgB={orgB}
+          loading={loading}
+          error={error}
+          onChangeOrg={handleChangeOrg}
+          onAnalyze={handleAnalyze}
+        />
+        <ToastStack toasts={toasts} />
+      </>
     );
   }
 
-  if (step === "board") {
+  if (step === "workspace") {
+    const count = commitmentsCount(items, statuses, viewingAs, effectiveOrgA, effectiveOrgB);
     return (
-      <AgreementBoard
-        items={items}
-        statuses={statuses}
-        viewingAs={viewingAs}
-        orgA={orgA || "Side A"}
-        orgB={orgB || "Side B"}
-        onSetViewingAs={setViewingAs}
-        onConfirm={handleConfirm}
-        onSaveEdit={handleSaveEdit}
-        onSoftAskDecision={handleSoftAskDecision}
-        onGenerateBrief={handleGenerateBrief}
-        briefLoading={briefLoading}
-        onBack={() => setStep("call")}
-      />
+      <div className="mx-auto max-w-6xl px-6 py-10">
+        <WorkspaceHeader
+          orgA={effectiveOrgA}
+          orgB={effectiveOrgB}
+          viewingAs={viewingAs}
+          onSetViewingAs={setViewingAs}
+          tab={workspaceTab}
+          onSetTab={setWorkspaceTab}
+          commitmentsCount={count}
+          onBack={() => setStep("call")}
+        />
+        {workspaceTab === "board" ? (
+          <AgreementBoard
+            items={items}
+            statuses={statuses}
+            viewingAs={viewingAs}
+            orgA={effectiveOrgA}
+            orgB={effectiveOrgB}
+            onConfirm={handleConfirm}
+            onSaveEdit={handleSaveEdit}
+            onSoftAskDecision={handleSoftAskDecision}
+            onSetCommitmentDueDate={handleSetCommitmentDueDate}
+            onGenerateBrief={handleGenerateBrief}
+            briefLoading={briefLoading}
+          />
+        ) : (
+          <CommitmentsView
+            items={items}
+            statuses={statuses}
+            viewingAs={viewingAs}
+            orgA={effectiveOrgA}
+            orgB={effectiveOrgB}
+            onConfirm={handleConfirm}
+            onToggleDone={handleToggleDone}
+          />
+        )}
+        <ToastStack toasts={toasts} />
+      </div>
     );
   }
 
   return (
-    <TeamBrief orgA={orgA || "Side A"} orgB={orgB || "Side B"} brief={brief} onBack={() => setStep("board")} />
+    <>
+      <TeamBrief orgA={effectiveOrgA} orgB={effectiveOrgB} brief={brief} onBack={() => setStep("workspace")} />
+      <ToastStack toasts={toasts} />
+    </>
   );
 }

@@ -65,6 +65,7 @@ export function fallbackReconcile(): AgreementItem[] {
       owner: null,
       due_date: null,
       clarification_question: "Would it be possible to consider featuring our new Chrono model on camera in at least one episode?",
+      raised_by: "B",
     },
     {
       id: "item-8",
@@ -75,11 +76,25 @@ export function fallbackReconcile(): AgreementItem[] {
       owner: null,
       due_date: null,
       clarification_question: "Could we possibly get an early look at the trailer before it goes public?",
+      raised_by: "B",
     },
   ];
 }
 
-export function fallbackBrief(orgA: string, orgB: string): BriefResult {
+export interface BriefCommitment {
+  text: string;
+  ownerLabel: string;
+  dueDate: string | null;
+}
+
+export function fallbackBrief(orgA: string, orgB: string, commitments: BriefCommitment[] = []): BriefResult {
+  const commitmentsSection =
+    commitments.length > 0
+      ? `\n\nCOMMITMENTS\n${commitments
+          .map((c) => `- ${c.ownerLabel} owes: ${c.text}${c.dueDate ? ` (due ${c.dueDate})` : ""}`)
+          .join("\n")}`
+      : "";
+
   return {
     brief: `Team Brief: ${orgA} x ${orgB} Partnership
 
@@ -103,6 +118,6 @@ NEXT STEPS
 - Align on one confirmed delivery date for the first cut.
 - Agree on the sponsorship figure and currency this week.
 - ${orgA} to respond to the Chrono model and early trailer access requests.
-- Confirm whether the extra behind-the-scenes clips are part of the deal.`,
+- Confirm whether the extra behind-the-scenes clips are part of the deal.${commitmentsSection}`,
   };
 }

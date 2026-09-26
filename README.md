@@ -56,28 +56,42 @@ accurate.
    Ambiguous items show both possible interpretations side by side. Soft asks
    show the original question with two buttons: "It's a request" or "Just
    asking."
-4. **Countersigning** &mdash; a toggle at the top switches between "Viewing as
-   [Side A]" and "Viewing as [Side B]." From either view, that side can
-   **Confirm** or **Edit** each item's text. An item is only locked once
-   *both* sides have confirmed the exact same text. If one side confirms an
-   item and the other side edits it to something different, the card flags
-   itself **"Mismatch — needs resolution"** and shows both versions until the
-   two sides land on identical wording. A progress bar shows "X of Y items
-   countersigned."
-5. **Team brief** &mdash; once every item is locked, "Generate team brief"
+4. **Countersigning** &mdash; a segmented toggle at the top switches between
+   "Viewing as [Side A]" and "Viewing as [Side B]." Each card shows a small
+   status seal per side (empty circle = pending, gold checkmark = signed).
+   From either view, that side can **Confirm** or **Edit** each item's text.
+   An item is only locked once *both* sides have confirmed the exact same
+   text, at which point it gets a gold "Countersigned" stamp. If one side
+   confirms an item and the other edits it to something different, the card
+   flags itself **"Mismatch — needs resolution"** and shows both versions
+   until the two sides land on identical wording. A progress bar shows "X of
+   Y items countersigned."
+5. **My commitments** &mdash; a second tab next to the agreement board,
+   scoped to whichever side you're currently viewing as. Marking a soft ask
+   "It's a request" turns it into a commitment owned by the side it was
+   asked of, with an optional due date. The tab shows three lists: **What we
+   owe** (countersigned items this side is responsible for, sorted by due
+   date, with a "mark done" checkbox), **What we're waiting on**
+   (countersigned items the other side owes), and **Needs our signature**
+   (items this side hasn't confirmed yet, with a one-click Confirm). The tab
+   label shows a live count.
+6. **Team brief** &mdash; once every item is locked, "Generate team brief"
    becomes enabled. It calls `/api/brief` (same fallback-safe pattern) to turn
-   the reconciled, resolved list into a plain-language brief for working
-   teams: decisions, open items to resolve, open requests, and next steps.
-   It's shown on its own screen with a one-click copy button.
+   the reconciled, resolved list &mdash; plus every commitment's owner and due
+   date &mdash; into a plain-language brief for working teams: decisions, open
+   items to resolve, open requests, commitments, and next steps. It's shown
+   on its own screen with a one-click copy button.
 
-All state (transcript, items, confirmations, the generated brief) lives in
-React state on the client. There is no database and no authentication &mdash;
-this is built as a live-demo tool, not a production system of record.
+All state (transcript, items, confirmations, commitments, the generated
+brief) lives in React state on the client. There is no database and no
+authentication &mdash; this is built as a live-demo tool, not a production
+system of record.
 
 ## Tech stack
 
 - Next.js 14 (App Router) + TypeScript
-- Tailwind CSS
+- Tailwind CSS, with a warm ivory/navy/champagne-gold palette, Playfair
+  Display (headings) and Inter (body) from Google Fonts
 - Browser Web Speech API (`webkitSpeechRecognition`) for live transcription
 - `@anthropic-ai/sdk` for the two API routes (`/api/reconcile`, `/api/brief`)
 
