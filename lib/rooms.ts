@@ -70,6 +70,26 @@ export async function saveRoom(room: RoomData): Promise<void> {
   await redis.set(roomKey(room.id), JSON.stringify(room), { ex: ROOM_TTL_SECONDS });
 }
 
+export async function listRooms(): Promise<RoomData[]> {
+  const redis = getRedis();
+  if (!redis) return [];
+
+  const keys = await redis.keys("countersign:room:*");
+  if (keys.length === 0) return [];
+
+  const values = await redis.mget<(string | RoomData | null)[]>(...keys);
+  const rooms: RoomData[] = [];
+  for (const raw of values) {
+    if (!raw) continue;
+    try {
+      rooms.push(typeof raw === "string" ? (JSON.parse(raw) as RoomData) : raw);
+    } catch {
+      // skip anything that fails to parse
+    }
+  }
+  return rooms;
+}
+
 export function sideForToken(room: RoomData, token: string | null | undefined): Side | null {
   if (!token) return null;
   if (token === room.tokens.A) return "A";

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { fallbackReconcile } from "@/lib/fallback";
 import { parseReconcileJson } from "@/lib/validate";
+import { isDemoTranscript } from "@/lib/demoCall";
 
 export const runtime = "nodejs";
 
@@ -46,6 +47,10 @@ export async function POST(req: NextRequest) {
 
   if (!transcript?.trim()) {
     return NextResponse.json({ error: "A transcript is required" }, { status: 400 });
+  }
+
+  if (isDemoTranscript(transcript)) {
+    return NextResponse.json({ items: fallbackReconcile(), source: "demo" });
   }
 
   const apiKey = process.env.ANTHROPIC_API_KEY;

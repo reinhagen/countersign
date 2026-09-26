@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityEntry, AgreementItem, ItemStatus, Side, SoftAskDecision } from "@/lib/types";
 import { isLocked } from "@/lib/itemStatus";
+import { describeActivity } from "@/lib/activityDescribe";
 import RoomBanner from "./RoomBanner";
 import RoomBoard from "./RoomBoard";
 import RoomCommitments from "./RoomCommitments";
@@ -30,27 +31,6 @@ interface RoomState {
 
 const POLL_MS = 3000;
 
-function describeToast(entry: ActivityEntry, orgName: string): string {
-  switch (entry.action) {
-    case "signed":
-      return `${orgName} signed: ${entry.itemText ?? "an item"}`;
-    case "edited":
-      return `${orgName} updated: ${entry.itemText ?? "an item"}`;
-    case "marked_request":
-      return `${orgName} marked a commitment: ${entry.itemText ?? "an item"}`;
-    case "marked_question":
-      return `${orgName} left as just a question: ${entry.itemText ?? "an item"}`;
-    case "set_due_date":
-      return `${orgName} set a due date: ${entry.itemText ?? "an item"}`;
-    case "toggled_done":
-      return `${orgName} checked off: ${entry.itemText ?? "an item"}`;
-    case "generated_brief":
-      return `${orgName} generated the team brief`;
-    default:
-      return `${orgName} took an action`;
-  }
-}
-
 export default function RoomView({ roomId, roomKey }: Props) {
   const [state, setState] = useState<RoomState | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -75,7 +55,7 @@ export default function RoomView({ roomId, roomKey }: Props) {
       seenActivityIds.current.add(entry.id);
       if (!firstLoad.current && entry.side !== prevSide) {
         const orgName = entry.side === "A" ? next.orgA : next.orgB;
-        pushToast(describeToast(entry, orgName), entry.side === "A" ? "navy" : "gold");
+        pushToast(describeActivity(entry, orgName), entry.side === "A" ? "navy" : "gold");
       }
     }
     firstLoad.current = false;

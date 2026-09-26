@@ -2,34 +2,12 @@
 
 import { ActivityEntry, Side } from "@/lib/types";
 import { formatDateTime } from "@/lib/format";
+import { describeActivity } from "@/lib/activityDescribe";
 
 interface Props {
   activity: ActivityEntry[];
   orgA: string;
   orgB: string;
-}
-
-function describe(entry: ActivityEntry, orgName: string): string {
-  switch (entry.action) {
-    case "room_created":
-      return "Room created";
-    case "signed":
-      return `${orgName} signed: ${entry.itemText ?? "an item"}`;
-    case "edited":
-      return `${orgName} edited: ${entry.itemText ?? "an item"}`;
-    case "marked_request":
-      return `${orgName} marked as a commitment: ${entry.itemText ?? "an item"}`;
-    case "marked_question":
-      return `${orgName} left as just a question: ${entry.itemText ?? "an item"}`;
-    case "set_due_date":
-      return `${orgName} set a due date${entry.detail ? ` (${entry.detail})` : ""}: ${entry.itemText ?? "an item"}`;
-    case "toggled_done":
-      return `${orgName} checked off: ${entry.itemText ?? "an item"}`;
-    case "generated_brief":
-      return `${orgName} generated the team brief`;
-    default:
-      return `${orgName} took an action`;
-  }
 }
 
 export default function ActivityPanel({ activity, orgA, orgB }: Props) {
@@ -52,7 +30,7 @@ export default function ActivityPanel({ activity, orgA, orgB }: Props) {
                 <li key={entry.id} className="flex items-start gap-3 border-b border-navy/5 px-5 py-3 last:border-0">
                   <span className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${dotColor}`} />
                   <div className="flex-1">
-                    <p className="text-sm text-navy/80">{describe(entry, orgName)}</p>
+                    <p className="text-sm text-navy/80">{describeActivity(entry, orgName)}</p>
                     <p className="text-xs text-navy/40">{formatDateTime(entry.timestamp)}</p>
                   </div>
                 </li>
