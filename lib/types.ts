@@ -1,4 +1,4 @@
-export type Category = "agreed" | "mismatch" | "one_sided" | "soft_ask";
+export type Category = "agreed" | "ambiguous" | "one_sided" | "soft_ask";
 
 export interface AgreementItem {
   id: string;
@@ -20,12 +20,9 @@ export type SoftAskDecision = "request" | "question" | null;
 export interface ItemStatus {
   aConfirmed: boolean;
   bConfirmed: boolean;
+  aText: string;
+  bText: string;
   softAskDecision?: SoftAskDecision;
-}
-
-export interface OrgNotes {
-  orgName: string;
-  notes: string;
 }
 
 export interface BriefResult {

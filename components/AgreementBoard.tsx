@@ -1,6 +1,7 @@
 "use client";
 
 import { AgreementItem, ItemStatus, SoftAskDecision } from "@/lib/types";
+import { initialStatusFor, isLocked } from "@/lib/itemStatus";
 import ItemCard from "./ItemCard";
 
 interface Props {
@@ -18,10 +19,10 @@ interface Props {
   onBack: () => void;
 }
 
-const CATEGORY_ORDER: AgreementItem["category"][] = ["agreed", "mismatch", "one_sided", "soft_ask"];
+const CATEGORY_ORDER: AgreementItem["category"][] = ["agreed", "ambiguous", "one_sided", "soft_ask"];
 const CATEGORY_TITLES: Record<AgreementItem["category"], string> = {
   agreed: "Agreed",
-  mismatch: "Mismatches",
+  ambiguous: "Ambiguous",
   one_sided: "One-sided",
   soft_ask: "Soft asks",
 };
@@ -40,7 +41,7 @@ export default function AgreementBoard({
   briefLoading,
   onBack,
 }: Props) {
-  const lockedCount = items.filter((i) => statuses[i.id]?.aConfirmed && statuses[i.id]?.bConfirmed).length;
+  const lockedCount = items.filter((i) => statuses[i.id] && isLocked(statuses[i.id])).length;
   const allLocked = lockedCount === items.length && items.length > 0;
 
   return (
@@ -48,7 +49,7 @@ export default function AgreementBoard({
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
           <button onClick={onBack} className="mb-2 text-xs font-medium text-ink/40 hover:text-ink/70">
-            &larr; Back to notes
+            &larr; Back to call
           </button>
           <h1 className="font-serif text-2xl font-semibold text-ink">
             {orgA} <span className="text-ink/30">&times;</span> {orgB}
@@ -112,9 +113,7 @@ export default function AgreementBoard({
                 <ItemCard
                   key={item.id}
                   item={item}
-                  status={
-                    statuses[item.id] ?? { aConfirmed: false, bConfirmed: false, softAskDecision: null }
-                  }
+                  status={statuses[item.id] ?? initialStatusFor(item)}
                   viewingAs={viewingAs}
                   orgA={orgA}
                   orgB={orgB}

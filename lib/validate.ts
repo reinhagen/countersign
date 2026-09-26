@@ -1,6 +1,6 @@
 import { AgreementItem, Category } from "./types";
 
-const CATEGORIES: Category[] = ["agreed", "mismatch", "one_sided", "soft_ask"];
+const CATEGORIES: Category[] = ["agreed", "ambiguous", "one_sided", "soft_ask"];
 
 function isNullableString(v: unknown): v is string | null {
   return v === null || typeof v === "string";

@@ -2,19 +2,17 @@
 
 import { useState } from "react";
 import { AgreementItem, ItemStatus, SoftAskDecision } from "@/lib/types";
-import { demoDefaults } from "./IntakeForm";
-import IntakeForm from "./IntakeForm";
+import { initialStatusFor } from "@/lib/itemStatus";
+import CallIntake from "./CallIntake";
 import AgreementBoard from "./AgreementBoard";
 import TeamBrief from "./TeamBrief";
 
-type Step = "intake" | "board" | "brief";
+type Step = "call" | "board" | "brief";
 
 export default function App() {
-  const [step, setStep] = useState<Step>("intake");
+  const [step, setStep] = useState<Step>("call");
   const [orgA, setOrgA] = useState("");
   const [orgB, setOrgB] = useState("");
-  const [notesA, setNotesA] = useState("");
-  const [notesB, setNotesB] = useState("");
   const [items, setItems] = useState<AgreementItem[]>([]);
   const [statuses, setStatuses] = useState<Record<string, ItemStatus>>({});
   const [viewingAs, setViewingAs] = useState<"A" | "B">("A");
@@ -23,23 +21,16 @@ export default function App() {
   const [briefLoading, setBriefLoading] = useState(false);
   const [brief, setBrief] = useState("");
 
-  const handleChange = (fields: Partial<{ orgA: string; orgB: string; notesA: string; notesB: string }>) => {
+  const handleChangeOrg = (fields: { orgA?: string; orgB?: string }) => {
     if (fields.orgA !== undefined) setOrgA(fields.orgA);
     if (fields.orgB !== undefined) setOrgB(fields.orgB);
-    if (fields.notesA !== undefined) setNotesA(fields.notesA);
-    if (fields.notesB !== undefined) setNotesB(fields.notesB);
   };
 
-  const handleLoadDemo = () => {
-    const d = demoDefaults();
-    setOrgA(d.orgA);
-    setOrgB(d.orgB);
-    setNotesA(d.notesA);
-    setNotesB(d.notesB);
-    setError(null);
-  };
-
-  const handleReconcile = async () => {
+  const handleAnalyze = async (transcript: string) => {
+    if (!transcript.trim()) {
+      setError("Nothing was captured yet — try listening again or paste a transcript.");
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -49,18 +40,18 @@ export default function App() {
         body: JSON.stringify({
           orgA: orgA || "Side A",
           orgB: orgB || "Side B",
-          notesA,
-          notesB,
+          transcript,
         }),
       });
       const data = await res.json();
       if (!res.ok || !data.items) {
-        throw new Error(data.error || "Reconciliation failed");
+        throw new Error(data.error || "Analysis failed");
       }
-      setItems(data.items as AgreementItem[]);
+      const fetchedItems = data.items as AgreementItem[];
+      setItems(fetchedItems);
       const initialStatuses: Record<string, ItemStatus> = {};
-      for (const item of data.items as AgreementItem[]) {
-        initialStatuses[item.id] = { aConfirmed: false, bConfirmed: false, softAskDecision: null };
+      for (const item of fetchedItems) {
+        initialStatuses[item.id] = initialStatusFor(item);
       }
       setStatuses(initialStatuses);
       setStep("board");
@@ -73,7 +64,8 @@ export default function App() {
 
   const handleConfirm = (id: string) => {
     setStatuses((prev) => {
-      const current = prev[id] ?? { aConfirmed: false, bConfirmed: false, softAskDecision: null };
+      const current = prev[id];
+      if (!current) return prev;
       return {
         ...prev,
         [id]: {
@@ -86,23 +78,15 @@ export default function App() {
   };
 
   const handleSaveEdit = (id: string, newText: string) => {
-    setItems((prev) =>
-      prev.map((item) =>
-        item.id === id
-          ? {
-              ...item,
-              side_a_version: viewingAs === "A" ? newText : item.side_a_version,
-              side_b_version: viewingAs === "B" ? newText : item.side_b_version,
-            }
-          : item
-      )
-    );
     setStatuses((prev) => {
-      const current = prev[id] ?? { aConfirmed: false, bConfirmed: false, softAskDecision: null };
+      const current = prev[id];
+      if (!current) return prev;
       return {
         ...prev,
         [id]: {
           ...current,
+          aText: viewingAs === "A" ? newText : current.aText,
+          bText: viewingAs === "B" ? newText : current.bText,
           aConfirmed: viewingAs === "A" ? false : current.aConfirmed,
           bConfirmed: viewingAs === "B" ? false : current.bConfirmed,
         },
@@ -112,7 +96,8 @@ export default function App() {
 
   const handleSoftAskDecision = (id: string, decision: SoftAskDecision) => {
     setStatuses((prev) => {
-      const current = prev[id] ?? { aConfirmed: false, bConfirmed: false, softAskDecision: null };
+      const current = prev[id];
+      if (!current) return prev;
       return { ...prev, [id]: { ...current, softAskDecision: decision } };
     });
   };
@@ -120,10 +105,14 @@ export default function App() {
   const handleGenerateBrief = async () => {
     setBriefLoading(true);
     try {
+      const resolvedItems = items.map((item) => ({
+        ...item,
+        text: statuses[item.id]?.aText ?? item.text,
+      }));
       const res = await fetch("/api/brief", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orgA: orgA || "Side A", orgB: orgB || "Side B", items }),
+        body: JSON.stringify({ orgA: orgA || "Side A", orgB: orgB || "Side B", items: resolvedItems }),
       });
       const data = await res.json();
       setBrief(data.brief || "");
@@ -136,18 +125,15 @@ export default function App() {
     }
   };
 
-  if (step === "intake") {
+  if (step === "call") {
     return (
-      <IntakeForm
+      <CallIntake
         orgA={orgA}
         orgB={orgB}
-        notesA={notesA}
-        notesB={notesB}
         loading={loading}
         error={error}
-        onChange={handleChange}
-        onLoadDemo={handleLoadDemo}
-        onReconcile={handleReconcile}
+        onChangeOrg={handleChangeOrg}
+        onAnalyze={handleAnalyze}
       />
     );
   }
@@ -166,7 +152,7 @@ export default function App() {
         onSoftAskDecision={handleSoftAskDecision}
         onGenerateBrief={handleGenerateBrief}
         briefLoading={briefLoading}
-        onBack={() => setStep("intake")}
+        onBack={() => setStep("call")}
       />
     );
   }

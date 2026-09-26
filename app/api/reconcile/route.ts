@@ -5,33 +5,32 @@ import { parseReconcileJson } from "@/lib/validate";
 
 export const runtime = "nodejs";
 
-const SYSTEM_PROMPT = `You are Countersign, a neutral agreement-reconciliation assistant. Two organizations each submit their own notes from the same partnership call. Your job is to compare the two sets of notes and produce a single, neutral list of discrete items.
+const SYSTEM_PROMPT = `You are Countersign, a neutral agreement-reconciliation assistant. You are given a single transcript of a partnership call between two organizations, Side A and Side B. Speakers are not pre-labeled — infer from context (introductions, who represents which company, phrasing like "our logo" or "your team") which lines belong to which organization.
 
 For each distinct point discussed, classify it into exactly one category:
-- "agreed": both sides recorded the same commitment, with no meaningful conflict.
-- "mismatch": both sides recorded the same topic but with different, conflicting specifics (e.g. different dates, amounts, or terms).
-- "one_sided": only one side's notes mention this item at all.
-- "soft_ask": a request phrased as a question or hesitant ask ("would it be possible...", "could we possibly...") that has not been agreed to as a firm commitment.
+- "agreed": both sides clearly voiced the same commitment, with no meaningful conflict or vagueness.
+- "ambiguous": the topic was discussed by both sides, but the language used could reasonably be understood two different ways (e.g. a vague date like "sometime in March" interpreted differently, or a figure given in different units/currencies without an explicit conversion). Capture the two plausible interpretations.
+- "one_sided": only one side voiced this commitment or offer; the other side did not acknowledge, confirm, or respond to it in the transcript.
+- "soft_ask": a request phrased as a question or hesitant ask ("would it be possible...", "could we possibly...") that was not agreed to as a firm commitment.
 
 Respond with ONLY a JSON array (no prose, no markdown fences). Each element must be an object with exactly these fields:
 {
   "id": string (unique slug, e.g. "item-1"),
   "text": string (a short neutral description of the item),
-  "category": "agreed" | "mismatch" | "one_sided" | "soft_ask",
-  "side_a_version": string or null (how side A described it, null if not mentioned by side A),
-  "side_b_version": string or null (how side B described it, null if not mentioned by side B),
-  "owner": string or null (a named owner/point of contact if mentioned),
-  "due_date": string or null (a date if one was mentioned),
-  "clarification_question": string or null (only for soft_ask items: the actual question being asked; null otherwise)
+  "category": "agreed" | "ambiguous" | "one_sided" | "soft_ask",
+  "side_a_version": string or null (Side A's phrasing/interpretation; for "ambiguous" items, one of the two interpretations; for "one_sided" items where only Side A voiced it, Side A's version; null if not applicable),
+  "side_b_version": string or null (Side B's phrasing/interpretation, same rules as above from Side B's perspective; null if not applicable),
+  "owner": string or null (a named person or side responsible, if mentioned),
+  "due_date": string or null (a date or deadline if one was mentioned),
+  "clarification_question": string or null (only for soft_ask items: the exact question being asked; null otherwise)
 }
 
-Be thorough: capture every commitment, discrepancy, and open ask you can find. Do not invent information that is not present in the notes.`;
+Be thorough: capture every commitment, ambiguity, one-sided offer, and open ask you can find. Do not invent information that is not present in the transcript.`;
 
 interface ReconcileBody {
   orgA: string;
   orgB: string;
-  notesA: string;
-  notesB: string;
+  transcript: string;
 }
 
 export async function POST(req: NextRequest) {
@@ -42,10 +41,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  const { orgA, orgB, notesA, notesB } = body;
+  const { orgA, orgB, transcript } = body;
 
-  if (!notesA?.trim() || !notesB?.trim()) {
-    return NextResponse.json({ error: "Both sides' notes are required" }, { status: 400 });
+  if (!transcript?.trim()) {
+    return NextResponse.json({ error: "A transcript is required" }, { status: 400 });
   }
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -63,7 +62,7 @@ export async function POST(req: NextRequest) {
       messages: [
         {
           role: "user",
-          content: `Side A: ${orgA || "Side A"}\nNotes:\n${notesA}\n\nSide B: ${orgB || "Side B"}\nNotes:\n${notesB}`,
+          content: `Side A: ${orgA || "Side A"}\nSide B: ${orgB || "Side B"}\n\nTranscript:\n${transcript}`,
         },
       ],
     });
