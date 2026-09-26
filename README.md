@@ -1,203 +1,172 @@
 # Countersign
 
-Countersign listens to your partner call and turns it into one record both
-sides sign — each from their own device.
+**Live demo:** [https://countersign-rouge.vercel.app](https://countersign-rouge.vercel.app)
+
+A supervisor's guide to what Countersign is, the problem it came from, how to
+run the demo end to end, and where it goes next.
 
 ## The problem
 
-After a partnership call, both sides walk away with their own memory of what
-was said. Dates get remembered differently, dollar figures get transposed
-into another currency, one side voices a commitment the other never
-acknowledges, and a hesitant "would it be possible to..." ask quietly turns
-into an assumed yes on one side and a "we never agreed to that" on the other.
-Weeks later, that drift becomes a real conflict — and it started the moment
-everyone hung up and wrote down their own version of the call.
+This idea came out of a customer discovery call with a brand partnerships PM
+at National Geographic. Her team runs a steady stream of sponsorship and
+co-marketing calls with outside brands — content deals, licensing, event
+tie-ins. After every call, both sides write up their own notes and send them
+around internally. Those notes almost never match: a delivery date one side
+remembers as "sometime in Q4" the other remembers as "before the holidays,"
+a dollar figure gets quoted in different currencies with no conversion
+written down, one side offers something as a throw-in that the other side
+never actually agreed to, and a soft "would it be possible to feature the
+new product?" quietly turns into an assumed yes on one side and "we never
+agreed to that" on the other. None of this is bad faith — it's just two
+people writing down their own memory of the same conversation. By the time
+anyone notices the mismatch, weeks have passed and it's a real conflict
+instead of a two-line clarification.
 
-Countersign removes that step entirely. Nobody writes notes. Countersign
-listens to the call itself (or a demo/pasted transcript), a neutral AI
-extracts every commitment, ambiguity, one-sided offer, and soft ask, and then
-each organization signs from its own device, in its own shared room. Nothing
-is locked in until both sides have explicitly signed the exact same wording.
+Countersign removes the step where that drift gets introduced. Nobody
+writes notes. Countersign listens to the call itself, has a neutral AI
+reconcile it into a single list of commitments, ambiguities, one-sided
+offers, and soft asks, and then has each organization sign off on that list
+from its own device. Nothing is final until both sides have explicitly
+signed the exact same wording.
 
-## How it works
+## Try it: a full walkthrough
 
-0. **Landing page** (`/`) &mdash; the headline, a one-paragraph explanation,
-   three value points, and two buttons: **Try the demo** (jumps straight into
-   a running demo call) and **Open workspace** (the product's home screen).
-1. **Listen** &mdash; enter both org names, agree to the consent notice
-   ("Everyone on this call must agree to it being transcribed"), and press
-   **Begin listening**. Countersign uses the browser's built-in speech
-   recognition (Chrome's Web Speech API) to transcribe the call live, with a
-   calm pulsing indicator, a running timer, and a scrolling transcript panel
-   with a timestamp column. If recognition stops on silence it automatically
-   restarts, so it keeps listening for the whole call until you press
-   **Stop & analyze**. Two secondary options let you skip listening
-   altogether: **paste or upload a transcript** (.txt), or **play a demo
-   call** that streams a realistic fictional Wildframe Media × Aurel Watches
-   sponsorship call into the transcript panel line by line, as if it were
-   being heard live.
-2. **Reconcile** &mdash; the full transcript plus both org names are sent to
-   `/api/reconcile`, which calls the Anthropic API (`claude-sonnet-5`) with a
-   prompt that infers who's speaking for which org from context, then
-   classifies every distinct point into one of four categories:
-   - **Agreed** &mdash; both sides clearly voiced the same commitment.
-   - **Ambiguous** &mdash; both sides discussed it, but the language could
-     reasonably be understood two different ways (e.g. "sometime in March"
-     meaning different things to each side). Both interpretations are kept.
-   - **One-sided** &mdash; only one side voiced a commitment or offer; the
-     other side never acknowledged it.
-   - **Soft ask** &mdash; a request phrased as a question ("would it be
-     possible to...") that was never a firm commitment.
+This is the fastest way to see the whole product. It takes about two
+minutes and needs no login, no data entry, and no real call.
 
-   The model is asked to return strict JSON. The response is parsed and
-   validated; if the API key is missing, the call fails, or the JSON doesn't
-   validate, the app **automatically falls back to a hardcoded demo result**.
-   And if the transcript is *exactly* the built-in demo call (regardless of
-   which org names were typed), `/api/reconcile` returns that same result
-   **instantly, without calling the Anthropic API at all** — the same applies
-   to generating a team brief for that demo scenario. This keeps the demo
-   free to run repeatedly and immune to API downtime.
-3. **Create a shared room** &mdash; when Redis is configured (see below),
-   analysis lands on a "Create shared room" screen. Creating one saves the
-   items and org names under a random room id in Redis, with two private
-   signing tokens, one per side. An invite panel then shows both private
-   links (`/room/[id]?key=[token]`), each with a **Copy** button and a QR
-   code (so a partner can open their link on a phone), and the note "Each
-   link can only sign for its own side. No account needed." The creator
-   continues into their own room; the other link is sent to the partner.
-4. **Sign in your own room** &mdash; a room page is entirely scoped to
-   whichever token opened it: there's no viewing-as toggle, because the link
-   itself decides your identity. A persistent top banner reads "You are
-   signing as [Your Org]" in that side's color (navy or gold) with a circular
-   initials seal. Every card shows two labeled, timestamped seals (e.g.
-   "Wildframe Media signed 8:42 AM" / "Aurel Watches — awaiting") and a
-   **Sign as [Your Org]** button in place of a generic "Confirm." An item
-   locks only once both sides have signed identical wording; if one side
-   signs and the other edits to something different, the card flags itself
-   "Mismatch — needs resolution" until the wording matches again. An
-   **Activity panel** lists every action with side, item, and timestamp. The
-   room polls every 3 seconds, so when the other side acts you see the card
-   update and a toast (e.g. "Wildframe Media signed: Payment terms")
-   automatically. An invalid or mistyped link shows a friendly error instead
-   of the room.
-5. **My commitments** &mdash; a tab next to the agreement board, always from
-   your side's point of view, with explicit headings: "[Your Org] owes,"
-   "Waiting on [Their Org]," and "Needs [Your Org]'s signature," each with a
-   clear empty state. Marking a soft ask "It's a request" turns it into a
-   commitment owned by the side it was asked of, with an optional due date
-   entered inline; owed items can be checked off once done.
-6. **Countersigned Record** &mdash; once every item is locked, a third tab
-   unlocks: a certificate-style page listing every item with both sides'
-   signature timestamps and all commitments with owners and due dates. A
-   **Download PDF** button opens a print-formatted view (via the browser's
-   print dialog) with all navigation and controls hidden. **Generate team
-   brief** is still here too: it calls `/api/rooms/[id]/brief` to turn the
-   reconciled, resolved list &mdash; plus every commitment's owner and due
-   date &mdash; into a plain-language brief for working teams, shown with a
-   one-click copy button and saved to the room so both sides see the same
-   brief.
+1. Open the [live demo](https://countersign-rouge.vercel.app) and click
+   **Try the demo** on the landing page.
+2. On the call screen, click **Play demo call**. A fictional sponsorship
+   call between "Wildframe Media" and "Aurel Watches" streams into the
+   transcript panel line by line, as if it were being heard live (about 18
+   seconds).
+3. Once it finishes, click **Stop & analyze**. Countersign reconciles the
+   transcript into a list of items — agreed points, two ambiguous ones
+   (a vague date, a figure with no currency conversion), a one-sided offer,
+   and two soft asks — grouped and color-coded on the agreement board.
+4. Click **Create shared room**. This is the core idea: instead of both
+   companies looking at one shared screen, each one gets its own private
+   link, and only that link can sign for that side.
+5. You'll land on an **invite panel** with two links, each with a QR code
+   and a copy button. **Open the "Your link" one in your current
+   browser/device, and open the "Partner's link" one in a different browser
+   (or an incognito window, or your phone) — this simulates the two real
+   companies, each on their own device.** Each link is scoped to one side
+   only; opening the wrong link can never sign for the other company.
+6. In either window, try the actions: **Edit** a card's wording, **Sign as
+   [Your Org]**, or mark a soft ask **"It's a request"** (which turns it
+   into a commitment with a due date). Actions sync to the other window
+   within a few seconds — watch a toast appear there confirming what you
+   just did.
+7. Once every item is signed identically by both sides, a **Countersigned
+   Record** tab unlocks: a certificate-style summary with every item's dual
+   signature timestamps, all commitments, and a **Download PDF** button.
+8. Check the **My commitments** tab (phrased from whichever side's link you
+   opened — "X owes" / "Waiting on Y" / "Needs X's signature"), and click
+   **Generate team brief** on the Countersigned Record page for a
+   plain-language summary either side can paste into Slack or email.
+9. Back out to **Open workspace** from the landing page to see this new
+   room listed alongside two seeded example partnerships, plus a
+   cross-partnership Commitments view and an Activity feed.
 
-### The workspace (`/workspace`)
+## How live listening works
 
-A left sidebar (a slide-in drawer on mobile) carries the wordmark, a
-workspace switcher, and navigation into three pages that give Wildframe
-Media's side of the product a home beyond any one call:
+The **Begin listening** button (instead of the demo call) uses Chrome's
+built-in speech recognition (`webkitSpeechRecognition`) to transcribe a real
+call live, right in the browser — no server-side audio processing, no
+recording stored anywhere. It shows a consent notice first ("Everyone on
+this call must agree to it being transcribed"), then a pulsing indicator, a
+running timer, and a scrolling transcript with timestamps. If it goes quiet
+for a moment it automatically restarts, so it keeps listening for the whole
+call until you click **Stop & analyze**. This only works in Chrome (or other
+`webkitSpeechRecognition`-capable browsers); anywhere else, Countersign
+shows a friendly notice and falls back to pasting or uploading a transcript.
 
-- **Partnerships** &mdash; a card per partnership with the partner's name,
-  status ("Awaiting signatures," "Countersigned," or "Needs attention"),
-  items signed ("7 of 9"), the next due commitment, and the last activity
-  timestamp. Every shared room you've created shows up here automatically,
-  alongside two clearly fictional seeded examples ("Northpeak Outdoors —
-  Countersigned Sep 12" and "Halden Air — 2 items need attention") so the
-  workspace never looks empty on a fresh demo. Live cards link straight into
-  your own room; the two sample cards are informational only.
-- **Commitments** &mdash; every open commitment across all partnerships,
-  grouped "We owe" / "Waiting on them" and sorted by due date, with overdue
-  items called out in muted red.
-- **Activity** &mdash; a merged, most-recent-first feed of every signature,
-  edit, and note across all partnerships (live and sample).
-- **New call** starts a fresh call from anywhere in the workspace.
+## How the partner flow works in real life
 
-### Demo mode (no database configured)
-
-If Redis isn't configured, Countersign automatically falls back to **Demo
-mode (both sides on one screen)**: the original single-screen workflow with
-a "Viewing as [Side A/B]" toggle, so you can still see and test the entire
-flow &mdash; agreement board, commitments, team brief &mdash; without any
-setup. This fallback is clearly labeled and only appears when no database is
-configured; whenever Redis is available, shared rooms are the only path, so
-point of view is always unambiguous. The workspace's Partnerships,
-Commitments, and Activity pages work either way, since the two seeded sample
-partnerships never depend on a database.
-
-All state for demo mode lives in React state on the client, with no
-persistence. Shared rooms persist in Redis for 30 days and require no
-authentication beyond each side's private link.
+In practice, **only the host runs Countersign during the call** — the
+partner company doesn't install anything, sign up for anything, or do
+anything differently on the call itself. After the call, the host clicks
+**Create shared room** and sends the partner their link (by email, Slack,
+whatever they'd already use). The partner opens that one link, on any
+device, and it just works: no account, no password, nothing to configure.
+They see only their own "Sign as [Their Org]" actions and can't act on the
+host's behalf, or vice versa. This is deliberate — it mirrors how a
+counter-signed paper contract works today (one copy, two signature lines)
+rather than asking a partner to adopt a new tool.
 
 ## Tech stack
 
-- Next.js 14 (App Router) + TypeScript
-- Tailwind CSS, with a warm ivory/navy/champagne-gold palette, Playfair
-  Display (headings) and Inter (body) from Google Fonts
-- Browser Web Speech API (`webkitSpeechRecognition`) for live transcription
-- `@anthropic-ai/sdk` for reconciliation and brief generation
-- `@upstash/redis` for shared room storage (optional — see below)
-- `qrcode.react` for the invite panel's QR codes
+- **Next.js 14** (App Router) + **TypeScript**, deployed on **Vercel**
+- **Tailwind CSS**, with a warm ivory/navy/champagne-gold visual system,
+  Playfair Display (headings) and Inter (body) from Google Fonts
+- **Chrome's Web Speech API** (`webkitSpeechRecognition`) for live, in-browser
+  transcription — no audio ever leaves the browser as audio
+- **Anthropic API** (`claude-sonnet-5`) for call reconciliation and
+  plain-language team briefs, via `@anthropic-ai/sdk`
+- **Upstash Redis** (`@upstash/redis`) for shared-room storage — optional;
+  without it the app runs in a single-screen "Demo mode" instead
+- **qrcode.react** for the invite panel's QR codes
 
-## Browser support
+## Environment variables
 
-Live listening requires a browser with `webkitSpeechRecognition` support
-(Chrome). In any other browser, Countersign shows a friendly notice and you
-can still use "paste or upload a transcript" or "play demo call" to see the
-full flow.
+Copy `.env.example` to `.env.local` and fill in what you have. Both are
+optional — Countersign is designed to fully work with neither set.
 
-## Shared rooms & storage
+| Variable | Required for | If unset |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | Live call reconciliation and team briefs | Falls back to a hardcoded demo result, so the flow still works end to end. The built-in demo call always skips the API regardless, to keep it free and immune to downtime. |
+| `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` | Real two-party shared rooms | Falls back to "Demo mode" — the original single-screen workflow with a "Viewing as [Side A/B]" toggle, so the whole flow is still testable with zero setup. |
+| `KV_REST_API_URL` / `KV_REST_API_TOKEN` | Same as above | Used automatically if the `UPSTASH_*` pair isn't set — this is what Vercel's own Redis/KV integration sets for you. |
 
-Shared rooms need a Redis-compatible REST database. Countersign reads
-credentials in this order:
+Secrets are only ever read from `process.env` inside server-side API routes
+— never in client code or committed to the repo.
 
-1. `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN`
-2. `KV_REST_API_URL` / `KV_REST_API_TOKEN` (e.g. Vercel's Redis/KV
-   integration, which sets these automatically)
+## Deploying
 
-If neither pair is present, `/api/config` reports rooms as disabled and the
-app transparently uses Demo mode instead — nothing breaks, and no code
-changes are needed either way.
+1. Push this repository to GitHub.
+2. Import it at [vercel.com/new](https://vercel.com/new) — Vercel
+   auto-detects Next.js, no build configuration needed.
+3. Add `ANTHROPIC_API_KEY` in the Vercel project's environment variables for
+   live reconciliation and briefs (optional).
+4. Add Redis credentials for real shared rooms (optional): either add
+   Vercel's Redis/KV integration (sets `KV_REST_API_URL` /
+   `KV_REST_API_TOKEN` automatically), or your own Upstash database's
+   `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN`.
+5. Deploy. That's it — zero required configuration to see the full demo.
 
-To enable rooms locally or in production:
-
-1. Create a free Redis database at [upstash.com](https://upstash.com) (or
-   add Vercel's Redis/KV integration to your project).
-2. Copy its REST URL and token into `UPSTASH_REDIS_REST_URL` /
-   `UPSTASH_REDIS_REST_TOKEN` (in `.env.local` for local dev, or your
-   deployment's environment variables).
-
-## Running locally
+To run locally:
 
 ```bash
 npm install
-cp .env.example .env.local   # add ANTHROPIC_API_KEY and/or Redis credentials
+cp .env.example .env.local   # optional
 npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) in Chrome for live
-listening. Without `ANTHROPIC_API_KEY` the app still works end to end via
-fallback data; without Redis credentials it runs in Demo mode.
+listening.
 
-## Deploying to Vercel
+## Roadmap
 
-1. Push this repository to GitHub (or import it directly from Git).
-2. In [vercel.com/new](https://vercel.com/new), import the repo. Vercel
-   auto-detects the Next.js framework &mdash; no build configuration needed.
-3. Add `ANTHROPIC_API_KEY` in the Vercel project settings (Settings &rarr;
-   Environment Variables) for live AI reconciliation and briefs. Optional:
-   the app still fully functions via its fallback data if you skip it.
-4. Add Redis credentials to enable real shared rooms: either add Vercel's
-   Redis/KV integration (which sets `KV_REST_API_URL` /
-   `KV_REST_API_TOKEN` automatically), or add your own Upstash database's
-   `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN`. Optional: without
-   either, the app runs in Demo mode.
-5. Deploy. That's it &mdash; zero extra configuration required.
+Things we'd build next, roughly in order of what a real partnerships team
+would ask for first:
 
-Secrets are never read from or written into the codebase; they're only ever
-read from `process.env` inside the server-side API routes.
+- **A Zoom (and Google Meet/Teams) bot** that joins the call automatically
+  and starts listening, so nobody has to remember to click "Begin
+  listening" — this is the single biggest friction point in the current
+  flow.
+- **Email-based sign-in** for the partner link, so a signature is tied to a
+  verified email address instead of just possession of a URL — closer to
+  how e-signature tools (DocuSign, etc.) establish who actually signed.
+- **Slack integration**: post the team brief and commitment reminders
+  directly into a deal's Slack channel, and let someone mark a commitment
+  done from Slack.
+- **Airtable / CRM integration**: sync partnerships, commitments, and due
+  dates into whatever system a partnerships team already tracks deals in,
+  instead of Countersign being one more standalone place to check.
+- **Multi-call partnerships**: today each room is one call; most real
+  partnerships span several calls over time, so rooms should be able to
+  accumulate items across multiple sessions.
+- **Team accounts**: today "Wildframe Media" in the workspace sidebar is a
+  fixed demo label with no login; a real deployment needs actual accounts
+  and permissions per organization.
