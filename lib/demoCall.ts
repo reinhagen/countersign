@@ -33,3 +33,20 @@ export const DEMO_CALL_LINES: DemoLine[] = [
 export function demoTranscriptText(orgA: string = DEMO_ORG_A, orgB: string = DEMO_ORG_B): string {
   return DEMO_CALL_LINES.map((line) => `${line.speaker === "A" ? orgA : orgB}: ${line.text}`).join("\n");
 }
+
+/**
+ * True if a transcript is exactly the built-in demo call (regardless of which
+ * org names were used), so the API can skip the Anthropic call entirely.
+ */
+export function isDemoTranscript(transcript: string): boolean {
+  const lines = transcript
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+  if (lines.length !== DEMO_CALL_LINES.length) return false;
+  return lines.every((line, i) => {
+    const sepIndex = line.indexOf(": ");
+    const text = sepIndex === -1 ? line : line.slice(sepIndex + 2);
+    return text.trim() === DEMO_CALL_LINES[i].text.trim();
+  });
+}

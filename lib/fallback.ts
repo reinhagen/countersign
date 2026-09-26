@@ -81,6 +81,13 @@ export function fallbackReconcile(): AgreementItem[] {
   ];
 }
 
+/** True if an item set is structurally the demo scenario's reconciled output. */
+export function isDemoItemSet(items: AgreementItem[]): boolean {
+  const demo = fallbackReconcile();
+  if (items.length !== demo.length) return false;
+  return items.every((item, i) => item.id === demo[i].id && item.text.trim() === demo[i].text.trim());
+}
+
 export interface BriefCommitment {
   text: string;
   ownerLabel: string;

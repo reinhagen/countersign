@@ -21,6 +21,9 @@ is locked in until both sides have explicitly signed the exact same wording.
 
 ## How it works
 
+0. **Landing page** (`/`) &mdash; the headline, a one-paragraph explanation,
+   three value points, and two buttons: **Try the demo** (jumps straight into
+   a running demo call) and **Open workspace** (the product's home screen).
 1. **Listen** &mdash; enter both org names, agree to the consent notice
    ("Everyone on this call must agree to it being transcribed"), and press
    **Begin listening**. Countersign uses the browser's built-in speech
@@ -48,9 +51,12 @@ is locked in until both sides have explicitly signed the exact same wording.
 
    The model is asked to return strict JSON. The response is parsed and
    validated; if the API key is missing, the call fails, or the JSON doesn't
-   validate, the app **automatically falls back to a hardcoded demo result**
-   that matches the built-in demo call, so the reconciliation step always
-   works, live demo or not.
+   validate, the app **automatically falls back to a hardcoded demo result**.
+   And if the transcript is *exactly* the built-in demo call (regardless of
+   which org names were typed), `/api/reconcile` returns that same result
+   **instantly, without calling the Anthropic API at all** — the same applies
+   to generating a team brief for that demo scenario. This keeps the demo
+   free to run repeatedly and immune to API downtime.
 3. **Create a shared room** &mdash; when Redis is configured (see below),
    analysis lands on a "Create shared room" screen. Creating one saves the
    items and org names under a random room id in Redis, with two private
@@ -91,6 +97,27 @@ is locked in until both sides have explicitly signed the exact same wording.
    one-click copy button and saved to the room so both sides see the same
    brief.
 
+### The workspace (`/workspace`)
+
+A left sidebar (a slide-in drawer on mobile) carries the wordmark, a
+workspace switcher, and navigation into three pages that give Wildframe
+Media's side of the product a home beyond any one call:
+
+- **Partnerships** &mdash; a card per partnership with the partner's name,
+  status ("Awaiting signatures," "Countersigned," or "Needs attention"),
+  items signed ("7 of 9"), the next due commitment, and the last activity
+  timestamp. Every shared room you've created shows up here automatically,
+  alongside two clearly fictional seeded examples ("Northpeak Outdoors —
+  Countersigned Sep 12" and "Halden Air — 2 items need attention") so the
+  workspace never looks empty on a fresh demo. Live cards link straight into
+  your own room; the two sample cards are informational only.
+- **Commitments** &mdash; every open commitment across all partnerships,
+  grouped "We owe" / "Waiting on them" and sorted by due date, with overdue
+  items called out in muted red.
+- **Activity** &mdash; a merged, most-recent-first feed of every signature,
+  edit, and note across all partnerships (live and sample).
+- **New call** starts a fresh call from anywhere in the workspace.
+
 ### Demo mode (no database configured)
 
 If Redis isn't configured, Countersign automatically falls back to **Demo
@@ -99,7 +126,9 @@ a "Viewing as [Side A/B]" toggle, so you can still see and test the entire
 flow &mdash; agreement board, commitments, team brief &mdash; without any
 setup. This fallback is clearly labeled and only appears when no database is
 configured; whenever Redis is available, shared rooms are the only path, so
-point of view is always unambiguous.
+point of view is always unambiguous. The workspace's Partnerships,
+Commitments, and Activity pages work either way, since the two seeded sample
+partnerships never depend on a database.
 
 All state for demo mode lives in React state on the client, with no
 persistence. Shared rooms persist in Redis for 30 days and require no

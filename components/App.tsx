@@ -23,7 +23,11 @@ import ToastStack, { ToastMessage } from "./Toast";
 type Step = "call" | "create-room" | "invite" | "workspace" | "brief";
 type WorkspaceTab = "board" | "commitments";
 
-export default function App() {
+interface Props {
+  autoPlayDemo?: boolean;
+}
+
+export default function App({ autoPlayDemo }: Props) {
   const [step, setStep] = useState<Step>("call");
   const [workspaceTab, setWorkspaceTab] = useState<WorkspaceTab>("board");
   const [orgA, setOrgA] = useState("");
@@ -245,6 +249,7 @@ export default function App() {
           error={error}
           onChangeOrg={handleChangeOrg}
           onAnalyze={handleAnalyze}
+          autoPlayDemo={autoPlayDemo}
         />
         <ToastStack toasts={toasts} />
       </>

@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { fallbackBrief, BriefCommitment } from "./fallback";
+import { fallbackBrief, BriefCommitment, isDemoItemSet } from "./fallback";
 import { AgreementItem } from "./types";
 
 const SYSTEM_PROMPT = `You are Countersign, a neutral assistant that writes plain-language team briefs from a reconciled list of partnership agreement items. Write a clear, concise brief for working teams on both sides. Structure it with these sections, using plain text headings (no markdown symbols):
@@ -14,7 +14,7 @@ Keep it factual and neutral. Do not invent information beyond what is given. Out
 
 export interface BriefGenerationResult {
   brief: string;
-  source: "anthropic" | "fallback";
+  source: "anthropic" | "fallback" | "demo";
 }
 
 export async function generateBriefText(
@@ -23,6 +23,10 @@ export async function generateBriefText(
   items: AgreementItem[],
   commitments: BriefCommitment[]
 ): Promise<BriefGenerationResult> {
+  if (isDemoItemSet(items)) {
+    return { brief: fallbackBrief(orgA, orgB, commitments).brief, source: "demo" };
+  }
+
   const apiKey = process.env.ANTHROPIC_API_KEY;
 
   if (!apiKey) {

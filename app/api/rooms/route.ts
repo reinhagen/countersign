@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createRoom } from "@/lib/rooms";
+import { createRoom, listRooms } from "@/lib/rooms";
 import { roomsEnabled } from "@/lib/redis";
 import { AgreementItem, ItemStatus } from "@/lib/types";
+import { summarizePartnership } from "@/lib/partnerships";
+import { SAMPLE_PARTNERSHIPS } from "@/lib/sampleData";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 interface CreateRoomBody {
   orgA: string;
@@ -47,4 +50,18 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json({ id: room.id, tokenA: room.tokens.A, tokenB: room.tokens.B });
+}
+
+export async function GET() {
+  const liveRooms = await listRooms();
+
+  const live = liveRooms
+    .map((room) =>
+      summarizePartnership(room, { isSample: false, roomUrl: `/room/${room.id}?key=${room.tokens.A}` })
+    )
+    .sort((a, b) => (b.lastActivityAt ?? 0) - (a.lastActivityAt ?? 0));
+
+  const samples = SAMPLE_PARTNERSHIPS.map((p) => summarizePartnership(p, { isSample: true, roomUrl: null }));
+
+  return NextResponse.json({ partnerships: [...live, ...samples] });
 }

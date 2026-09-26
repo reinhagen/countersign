@@ -10,6 +10,7 @@ interface Props {
   error: string | null;
   onChangeOrg: (fields: { orgA?: string; orgB?: string }) => void;
   onAnalyze: (transcript: string) => void;
+  autoPlayDemo?: boolean;
 }
 
 type Mode = "idle" | "listening" | "demo";
@@ -27,7 +28,7 @@ function formatTime(totalSeconds: number) {
   return `${m}:${s}`;
 }
 
-export default function CallIntake({ orgA, orgB, loading, error, onChangeOrg, onAnalyze }: Props) {
+export default function CallIntake({ orgA, orgB, loading, error, onChangeOrg, onAnalyze, autoPlayDemo }: Props) {
   const [mode, setMode] = useState<Mode>("idle");
   const [consentChecked, setConsentChecked] = useState(false);
   const [lines, setLines] = useState<TranscriptLine[]>([]);
@@ -69,6 +70,11 @@ export default function CallIntake({ orgA, orgB, loading, error, onChangeOrg, on
       panelRef.current.scrollTop = panelRef.current.scrollHeight;
     }
   }, [lines, interim]);
+
+  useEffect(() => {
+    if (autoPlayDemo) playDemoCall();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoPlayDemo]);
 
   const startTimer = () => {
     stopTimer();
