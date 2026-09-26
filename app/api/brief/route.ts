@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
-import { fallbackBrief } from "@/lib/fallback";
+import { fallbackBrief, BriefCommitment } from "@/lib/fallback";
 import { AgreementItem } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -10,15 +10,16 @@ const SYSTEM_PROMPT = `You are Countersign, a neutral assistant that writes plai
 DECISIONS - firm commitments both sides confirmed.
 OPEN ITEMS TO RESOLVE - ambiguous or one-sided items that still need resolution.
 OPEN REQUESTS - soft asks that are not yet commitments.
-OWNERS - named owners/points of contact, if any.
+COMMITMENTS - a list of concrete commitments with an owner and due date, drawn from the "commitments" array provided. For each, state who owes what and when it's due (or "no due date set").
 NEXT STEPS - a short actionable list.
 
-Keep it factual and neutral. Do not invent information beyond what is given. Output plain text only, no markdown formatting.`;
+Keep it factual and neutral. Do not invent information beyond what is given. Output plain text only, no markdown formatting. Omit a section if it has nothing to report.`;
 
 interface BriefBody {
   orgA: string;
   orgB: string;
   items: AgreementItem[];
+  commitments?: BriefCommitment[];
 }
 
 export async function POST(req: NextRequest) {
@@ -29,7 +30,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  const { orgA, orgB, items } = body;
+  const { orgA, orgB, items, commitments = [] } = body;
 
   if (!items || !Array.isArray(items) || items.length === 0) {
     return NextResponse.json({ error: "Items are required" }, { status: 400 });
@@ -38,7 +39,10 @@ export async function POST(req: NextRequest) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
 
   if (!apiKey) {
-    return NextResponse.json({ brief: fallbackBrief(orgA || "Side A", orgB || "Side B").brief, source: "fallback" });
+    return NextResponse.json({
+      brief: fallbackBrief(orgA || "Side A", orgB || "Side B", commitments).brief,
+      source: "fallback",
+    });
   }
 
   try {
@@ -50,7 +54,11 @@ export async function POST(req: NextRequest) {
       messages: [
         {
           role: "user",
-          content: `Side A: ${orgA || "Side A"}\nSide B: ${orgB || "Side B"}\n\nReconciled items (JSON):\n${JSON.stringify(items, null, 2)}`,
+          content: `Side A: ${orgA || "Side A"}\nSide B: ${orgB || "Side B"}\n\nReconciled items (JSON):\n${JSON.stringify(
+            items,
+            null,
+            2
+          )}\n\nCommitments (JSON):\n${JSON.stringify(commitments, null, 2)}`,
         },
       ],
     });
@@ -59,12 +67,18 @@ export async function POST(req: NextRequest) {
     const raw = textBlock && textBlock.type === "text" ? textBlock.text.trim() : "";
 
     if (!raw) {
-      return NextResponse.json({ brief: fallbackBrief(orgA || "Side A", orgB || "Side B").brief, source: "fallback" });
+      return NextResponse.json({
+        brief: fallbackBrief(orgA || "Side A", orgB || "Side B", commitments).brief,
+        source: "fallback",
+      });
     }
 
     return NextResponse.json({ brief: raw, source: "anthropic" });
   } catch (err) {
     console.error("Brief API error", err);
-    return NextResponse.json({ brief: fallbackBrief(orgA || "Side A", orgB || "Side B").brief, source: "fallback" });
+    return NextResponse.json({
+      brief: fallbackBrief(orgA || "Side A", orgB || "Side B", commitments).brief,
+      source: "fallback",
+    });
   }
 }

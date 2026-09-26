@@ -10,13 +10,12 @@ interface Props {
   viewingAs: "A" | "B";
   orgA: string;
   orgB: string;
-  onSetViewingAs: (v: "A" | "B") => void;
   onConfirm: (id: string) => void;
   onSaveEdit: (id: string, newText: string) => void;
   onSoftAskDecision: (id: string, decision: SoftAskDecision) => void;
+  onSetCommitmentDueDate: (id: string, dueDate: string) => void;
   onGenerateBrief: () => void;
   briefLoading: boolean;
-  onBack: () => void;
 }
 
 const CATEGORY_ORDER: AgreementItem["category"][] = ["agreed", "ambiguous", "one_sided", "soft_ask"];
@@ -33,60 +32,29 @@ export default function AgreementBoard({
   viewingAs,
   orgA,
   orgB,
-  onSetViewingAs,
   onConfirm,
   onSaveEdit,
   onSoftAskDecision,
+  onSetCommitmentDueDate,
   onGenerateBrief,
   briefLoading,
-  onBack,
 }: Props) {
   const lockedCount = items.filter((i) => statuses[i.id] && isLocked(statuses[i.id])).length;
   const allLocked = lockedCount === items.length && items.length > 0;
 
   return (
-    <div className="mx-auto max-w-6xl px-6 py-10">
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <button onClick={onBack} className="mb-2 text-xs font-medium text-ink/40 hover:text-ink/70">
-            &larr; Back to call
-          </button>
-          <h1 className="font-serif text-2xl font-semibold text-ink">
-            {orgA} <span className="text-ink/30">&times;</span> {orgB}
-          </h1>
-        </div>
-
-        <div className="flex items-center gap-3 rounded-full border border-ink/10 bg-white p-1 shadow-sm">
-          <button
-            onClick={() => onSetViewingAs("A")}
-            className={`rounded-full px-4 py-1.5 text-sm font-semibold transition ${
-              viewingAs === "A" ? "bg-ink text-white" : "text-ink/60 hover:text-ink"
-            }`}
-          >
-            Viewing as {orgA}
-          </button>
-          <button
-            onClick={() => onSetViewingAs("B")}
-            className={`rounded-full px-4 py-1.5 text-sm font-semibold transition ${
-              viewingAs === "B" ? "bg-ink text-white" : "text-ink/60 hover:text-ink"
-            }`}
-          >
-            Viewing as {orgB}
-          </button>
-        </div>
-      </div>
-
-      <div className="mb-8 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-ink/10 bg-white p-5 shadow-sm">
-        <div className="flex-1 min-w-[220px]">
+    <div>
+      <div className="mb-8 flex flex-wrap items-center justify-between gap-4 rounded-lg border border-navy/10 bg-white p-5 shadow-hairline">
+        <div className="min-w-[220px] flex-1">
           <div className="mb-1.5 flex items-center justify-between text-sm">
-            <span className="font-medium text-ink/70">
+            <span className="font-medium text-navy/70">
               {lockedCount} of {items.length} items countersigned
             </span>
-            <span className="text-ink/40">{items.length > 0 ? Math.round((lockedCount / items.length) * 100) : 0}%</span>
+            <span className="text-navy/40">{items.length > 0 ? Math.round((lockedCount / items.length) * 100) : 0}%</span>
           </div>
-          <div className="h-2 w-full overflow-hidden rounded-full bg-ink/10">
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-navy/10">
             <div
-              className="h-full rounded-full bg-emerald-500 transition-all"
+              className="h-full rounded-full bg-gold transition-all duration-500"
               style={{ width: `${items.length > 0 ? (lockedCount / items.length) * 100 : 0}%` }}
             />
           </div>
@@ -94,7 +62,7 @@ export default function AgreementBoard({
         <button
           onClick={onGenerateBrief}
           disabled={!allLocked || briefLoading}
-          className="rounded-full bg-ink px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-ink/90 disabled:cursor-not-allowed disabled:bg-ink/25"
+          className="rounded-lg bg-navy px-6 py-2.5 text-sm font-semibold text-white shadow-hairline transition hover:bg-navy-light disabled:cursor-not-allowed disabled:bg-navy/25"
         >
           {briefLoading ? "Generating brief…" : "Generate team brief"}
         </button>
@@ -105,7 +73,7 @@ export default function AgreementBoard({
         if (catItems.length === 0) return null;
         return (
           <div key={cat} className="mb-8">
-            <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ink/50">
+            <h2 className="tracking-caps mb-3 text-xs font-semibold text-navy/45">
               {CATEGORY_TITLES[cat]} ({catItems.length})
             </h2>
             <div className="grid gap-4 sm:grid-cols-2">
@@ -120,6 +88,7 @@ export default function AgreementBoard({
                   onConfirm={() => onConfirm(item.id)}
                   onSaveEdit={(text) => onSaveEdit(item.id, text)}
                   onSoftAskDecision={(decision) => onSoftAskDecision(item.id, decision)}
+                  onSetCommitmentDueDate={(dueDate) => onSetCommitmentDueDate(item.id, dueDate)}
                 />
               ))}
             </div>

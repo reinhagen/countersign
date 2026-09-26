@@ -1,9 +1,18 @@
-import { AgreementItem, ItemStatus } from "./types";
+import { AgreementItem, ItemStatus, Side } from "./types";
 
 export function initialStatusFor(item: AgreementItem): ItemStatus {
   const aText = (item.category === "ambiguous" ? item.side_a_version : null) ?? item.text;
   const bText = (item.category === "ambiguous" ? item.side_b_version : null) ?? item.text;
-  return { aConfirmed: false, bConfirmed: false, aText, bText, softAskDecision: null };
+  return {
+    aConfirmed: false,
+    bConfirmed: false,
+    aText,
+    bText,
+    softAskDecision: null,
+    commitmentOwner: null,
+    commitmentDueDate: null,
+    done: false,
+  };
 }
 
 export function textsMatch(status: ItemStatus): boolean {
@@ -16,4 +25,64 @@ export function isLocked(status: ItemStatus): boolean {
 
 export function isDiverged(status: ItemStatus): boolean {
   return !textsMatch(status);
+}
+
+export function otherSide(side: Side): Side {
+  return side === "A" ? "B" : "A";
+}
+
+export function isConfirmedBy(status: ItemStatus, side: Side): boolean {
+  return side === "A" ? status.aConfirmed : status.bConfirmed;
+}
+
+/** Best-effort match of a free-text owner string (e.g. "Priya (Wildframe)") to a side. */
+export function ownerSideFromText(ownerText: string | null | undefined, orgA: string, orgB: string): Side | null {
+  if (!ownerText) return null;
+  const lower = ownerText.toLowerCase();
+  const a = orgA.trim().toLowerCase();
+  const b = orgB.trim().toLowerCase();
+  if (a && lower.includes(a)) return "A";
+  if (b && lower.includes(b)) return "B";
+  return null;
+}
+
+/** The side responsible for an item: an explicit commitment owner wins, else inferred from the owner text. */
+export function effectiveOwnerSide(item: AgreementItem, status: ItemStatus, orgA: string, orgB: string): Side | null {
+  if (status.commitmentOwner) return status.commitmentOwner;
+  return ownerSideFromText(item.owner, orgA, orgB);
+}
+
+export function effectiveDueDate(item: AgreementItem, status: ItemStatus): string | null {
+  return status.commitmentDueDate ?? item.due_date ?? null;
+}
+
+export function commitmentsCount(
+  items: AgreementItem[],
+  statuses: Record<string, ItemStatus>,
+  viewingAs: Side,
+  orgA: string,
+  orgB: string
+): number {
+  let count = 0;
+  for (const item of items) {
+    const status = statuses[item.id];
+    if (!status) continue;
+    if (isLocked(status)) {
+      const side = effectiveOwnerSide(item, status, orgA, orgB);
+      if (side === viewingAs || side === otherSide(viewingAs)) count++;
+    } else if (!isConfirmedBy(status, viewingAs)) {
+      count++;
+    }
+  }
+  return count;
+}
+
+export function effectiveOwnerLabel(
+  item: AgreementItem,
+  status: ItemStatus,
+  orgA: string,
+  orgB: string
+): string | null {
+  if (status.commitmentOwner) return status.commitmentOwner === "A" ? orgA : orgB;
+  return item.owner;
 }

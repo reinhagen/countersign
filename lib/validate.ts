@@ -39,6 +39,7 @@ export function parseReconcileJson(raw: string): AgreementItem[] | null {
     if (!isNullableString(o.owner ?? null)) return null;
     if (!isNullableString(o.due_date ?? null)) return null;
     if (o.clarification_question !== undefined && !isNullableString(o.clarification_question)) return null;
+    if (o.raised_by !== undefined && o.raised_by !== null && o.raised_by !== "A" && o.raised_by !== "B") return null;
 
     items.push({
       id: o.id,
@@ -49,6 +50,7 @@ export function parseReconcileJson(raw: string): AgreementItem[] | null {
       owner: (o.owner as string | null) ?? null,
       due_date: (o.due_date as string | null) ?? null,
       clarification_question: (o.clarification_question as string | null | undefined) ?? null,
+      raised_by: (o.raised_by as "A" | "B" | null | undefined) ?? null,
     });
   }
 
