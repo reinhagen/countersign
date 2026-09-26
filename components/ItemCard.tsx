@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { AgreementItem, ItemStatus, SoftAskDecision } from "@/lib/types";
+import { isLocked, isDiverged } from "@/lib/itemStatus";
 import CategoryBadge from "./CategoryBadge";
 
 interface Props {
@@ -25,16 +26,17 @@ export default function ItemCard({
   onSaveEdit,
   onSoftAskDecision,
 }: Props) {
-  const locked = status.aConfirmed && status.bConfirmed;
+  const locked = isLocked(status);
+  const diverged = isDiverged(status);
   const myConfirmed = viewingAs === "A" ? status.aConfirmed : status.bConfirmed;
-  const myVersion = (viewingAs === "A" ? item.side_a_version : item.side_b_version) ?? item.text;
+  const myText = viewingAs === "A" ? status.aText : status.bText;
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(myVersion);
+  const [draft, setDraft] = useState(myText);
 
   const borderTint =
     item.category === "agreed"
       ? "border-l-emerald-400"
-      : item.category === "mismatch"
+      : diverged
       ? "border-l-amber-400"
       : item.category === "one_sided"
       ? "border-l-sky-400"
@@ -62,23 +64,31 @@ export default function ItemCard({
 
       <p className="mb-3 text-sm font-medium leading-relaxed text-ink">{item.text}</p>
 
-      {item.category === "mismatch" ? (
-        <div className="mb-3 grid gap-3 sm:grid-cols-2">
-          <div className="rounded-lg bg-ink/[0.03] p-3">
-            <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-ink/40">{orgA} said</div>
-            <div className="text-sm text-ink/80">{item.side_a_version ?? "—"}</div>
+      {diverged ? (
+        <div className="mb-3">
+          <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-amber-700/80">
+            {item.category === "ambiguous" && !status.aConfirmed && !status.bConfirmed
+              ? "Two possible interpretations"
+              : "Mismatch — needs resolution"}
           </div>
-          <div className="rounded-lg bg-ink/[0.03] p-3">
-            <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-ink/40">{orgB} said</div>
-            <div className="text-sm text-ink/80">{item.side_b_version ?? "—"}</div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="rounded-lg bg-ink/[0.03] p-3">
+              <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-ink/40">{orgA} version</div>
+              <div className="text-sm text-ink/80">{status.aText}</div>
+            </div>
+            <div className="rounded-lg bg-ink/[0.03] p-3">
+              <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-ink/40">{orgB} version</div>
+              <div className="text-sm text-ink/80">{status.bText}</div>
+            </div>
           </div>
-        </div>
-      ) : item.category === "one_sided" ? (
-        <div className="mb-3 rounded-lg bg-ink/[0.03] p-3 text-sm text-ink/80">
-          Only recorded by {item.side_a_version ? orgA : orgB}:{" "}
-          {item.side_a_version ?? item.side_b_version}
         </div>
       ) : null}
+
+      {item.category === "one_sided" && (
+        <div className="mb-3 rounded-lg bg-sky-50 p-3 text-sm text-sky-900">
+          Only voiced by {item.side_a_version ? orgA : orgB} on the call — the other side did not respond to it.
+        </div>
+      )}
 
       {item.category === "soft_ask" && item.clarification_question && (
         <div className="mb-3 rounded-lg bg-violet-50 p-3">
@@ -140,7 +150,7 @@ export default function ItemCard({
             </button>
             <button
               onClick={() => {
-                setDraft(myVersion);
+                setDraft(myText);
                 setEditing(false);
               }}
               className="rounded-full border border-ink/15 px-4 py-1.5 text-xs font-semibold text-ink/70 hover:bg-ink/5"
@@ -166,7 +176,7 @@ export default function ItemCard({
           </button>
           <button
             onClick={() => {
-              setDraft(myVersion);
+              setDraft(myText);
               setEditing(true);
             }}
             className="rounded-full border border-ink/15 px-4 py-1.5 text-xs font-semibold text-ink/70 hover:bg-ink/5"
