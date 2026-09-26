@@ -12,6 +12,11 @@ import { ActivityAction, ActivityEntry, RoomView, SoftAskDecision } from "@/lib/
 
 export const runtime = "nodejs";
 
+// A rapid double-click (or a slow request retried by an impatient click)
+// should not log the same action twice. "toggle_done" is exempt since each
+// click is meant to flip the checkbox.
+const DUPLICATE_WINDOW_MS = 4000;
+
 type ActionType = "confirm" | "edit" | "soft_ask_decision" | "set_due_date" | "toggle_done";
 
 interface ActionBody {
@@ -85,16 +90,28 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       return NextResponse.json({ error: "Unknown action type" }, { status: 400 });
   }
 
-  const entry: ActivityEntry = {
-    id: `${now}-${Math.random().toString(36).slice(2, 8)}`,
-    side,
-    action,
-    itemId: item.id,
-    itemText: item.text,
-    detail,
-    timestamp: now,
-  };
-  room.activity.push(entry);
+  const lastEntry = room.activity[room.activity.length - 1];
+  const isDuplicate =
+    action !== "toggled_done" &&
+    lastEntry &&
+    lastEntry.side === side &&
+    lastEntry.action === action &&
+    lastEntry.itemId === item.id &&
+    lastEntry.detail === detail &&
+    now - lastEntry.timestamp < DUPLICATE_WINDOW_MS;
+
+  if (!isDuplicate) {
+    const entry: ActivityEntry = {
+      id: `${now}-${Math.random().toString(36).slice(2, 8)}`,
+      side,
+      action,
+      itemId: item.id,
+      itemText: item.text,
+      detail,
+      timestamp: now,
+    };
+    room.activity.push(entry);
+  }
 
   await saveRoom(room);
 

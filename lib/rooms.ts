@@ -1,5 +1,6 @@
 import { getRedis } from "./redis";
 import { AgreementItem, ItemStatus, RoomData, Side } from "./types";
+import { isDiverged, migrateStatusIfDiverged } from "./itemStatus";
 
 const ROOM_TTL_SECONDS = 60 * 60 * 24 * 30; // 30 days
 const MAX_ACTIVITY_ENTRIES = 200;
@@ -58,7 +59,25 @@ export async function getRoom(id: string): Promise<RoomData | null> {
   const raw = await redis.get<string | RoomData>(roomKey(id));
   if (!raw) return null;
   // The upstash client may already deserialize JSON depending on version/config.
-  return typeof raw === "string" ? (JSON.parse(raw) as RoomData) : raw;
+  const room = typeof raw === "string" ? (JSON.parse(raw) as RoomData) : raw;
+
+  // Repair any items saved before the propose/accept flow existed, where two
+  // different signed versions could get permanently stuck as a mismatch.
+  let migrated = false;
+  for (const item of room.items) {
+    const status = room.statuses[item.id];
+    if (!status || !isDiverged(status)) continue;
+    const repaired = migrateStatusIfDiverged(status, room.activity, item.id);
+    if (repaired !== status) {
+      room.statuses[item.id] = repaired;
+      migrated = true;
+    }
+  }
+  if (migrated) {
+    await saveRoom(room);
+  }
+
+  return room;
 }
 
 export async function saveRoom(room: RoomData): Promise<void> {

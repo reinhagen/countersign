@@ -9,6 +9,8 @@ import {
   commitmentsCount,
   effectiveOwnerLabel,
   effectiveDueDate,
+  applyConfirm,
+  applyEdit,
 } from "@/lib/itemStatus";
 import type { BriefCommitment } from "@/lib/fallback";
 import CallIntake from "./CallIntake";
@@ -142,11 +144,7 @@ export default function App({ autoPlayDemo }: Props) {
   const handleConfirm = (id: string) => {
     const current = statuses[id];
     if (!current) return;
-    const next: ItemStatus = {
-      ...current,
-      aConfirmed: viewingAs === "A" ? true : current.aConfirmed,
-      bConfirmed: viewingAs === "B" ? true : current.bConfirmed,
-    };
+    const next = applyConfirm(current, viewingAs);
     setStatuses((prev) => ({ ...prev, [id]: next }));
     if (isLocked(next)) {
       pushToast("Countersigned — both sides have signed.", "gold");
@@ -159,16 +157,7 @@ export default function App({ autoPlayDemo }: Props) {
     setStatuses((prev) => {
       const current = prev[id];
       if (!current) return prev;
-      return {
-        ...prev,
-        [id]: {
-          ...current,
-          aText: viewingAs === "A" ? newText : current.aText,
-          bText: viewingAs === "B" ? newText : current.bText,
-          aConfirmed: viewingAs === "A" ? false : current.aConfirmed,
-          bConfirmed: viewingAs === "B" ? false : current.bConfirmed,
-        },
-      };
+      return { ...prev, [id]: applyEdit(current, viewingAs, newText) };
     });
   };
 

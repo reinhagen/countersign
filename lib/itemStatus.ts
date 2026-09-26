@@ -1,4 +1,4 @@
-import { AgreementItem, ItemStatus, Side, SoftAskDecision } from "./types";
+import { ActivityEntry, AgreementItem, ItemStatus, Side, SoftAskDecision } from "./types";
 
 export function initialStatusFor(item: AgreementItem): ItemStatus {
   const aText = (item.category === "ambiguous" ? item.side_a_version : null) ?? item.text;
@@ -14,6 +14,7 @@ export function initialStatusFor(item: AgreementItem): ItemStatus {
     done: false,
     aSignedAt: null,
     bSignedAt: null,
+    proposedBy: null,
   };
 }
 
@@ -41,6 +42,11 @@ export function signedAtFor(status: ItemStatus, side: Side): number | null {
   return (side === "A" ? status.aSignedAt : status.bSignedAt) ?? null;
 }
 
+/** True once either side has proposed a single clarified version for a divergent item. */
+export function hasProposal(status: ItemStatus): boolean {
+  return Boolean(status.proposedBy);
+}
+
 // --- Pure mutators, shared between the local demo-mode reducer and the room action API ---
 
 export function applyConfirm(status: ItemStatus, side: Side): ItemStatus {
@@ -54,16 +60,52 @@ export function applyConfirm(status: ItemStatus, side: Side): ItemStatus {
   };
 }
 
+/**
+ * Editing always proposes a single clarified version for BOTH sides — this is
+ * how a two-version (ambiguous, or any other) mismatch gets resolved. The
+ * proposer is auto-signed; the other side's prior signature is cleared so
+ * they can review and either sign as-is or counter-propose.
+ */
 export function applyEdit(status: ItemStatus, side: Side, newText: string): ItemStatus {
+  const now = Date.now();
   return {
     ...status,
-    aText: side === "A" ? newText : status.aText,
-    bText: side === "B" ? newText : status.bText,
-    aConfirmed: side === "A" ? false : status.aConfirmed,
-    bConfirmed: side === "B" ? false : status.bConfirmed,
-    aSignedAt: side === "A" ? null : status.aSignedAt,
-    bSignedAt: side === "B" ? null : status.bSignedAt,
+    aText: newText,
+    bText: newText,
+    aConfirmed: side === "A",
+    bConfirmed: side === "B",
+    aSignedAt: side === "A" ? now : null,
+    bSignedAt: side === "B" ? now : null,
+    proposedBy: side,
   };
+}
+
+/**
+ * One-time repair for rooms saved before the propose/accept flow existed,
+ * where both sides could independently sign two different versions of the
+ * same item and it would never lock. Only fires for genuinely *stuck* items
+ * — at least one side already signed under the old broken logic — not for a
+ * freshly reconciled ambiguous item that's simply awaiting its first
+ * proposal (that's normal, expected divergence, not a bug to repair).
+ * Treats whichever side has the most recent activity for this item
+ * (preferring an explicit edit) as the proposer, and adopts their text as
+ * the single proposed version.
+ */
+export function migrateStatusIfDiverged(
+  status: ItemStatus,
+  activity: ActivityEntry[],
+  itemId: string
+): ItemStatus {
+  const stuck = isDiverged(status) && !status.proposedBy && (status.aConfirmed || status.bConfirmed);
+  if (!stuck) return status;
+
+  const forItem = activity.filter((e) => e.itemId === itemId);
+  const editEntries = forItem.filter((e) => e.action === "edited").sort((a, b) => b.timestamp - a.timestamp);
+  const anyEntries = [...forItem].sort((a, b) => b.timestamp - a.timestamp);
+
+  const side: Side = editEntries[0]?.side ?? anyEntries[0]?.side ?? "A";
+  const proposedText = side === "A" ? status.aText : status.bText;
+  return applyEdit(status, side, proposedText);
 }
 
 export function applySoftAskDecision(

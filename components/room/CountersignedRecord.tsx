@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { AgreementItem, ItemStatus } from "@/lib/types";
-import { effectiveDueDate, effectiveOwnerLabel, signedAtFor } from "@/lib/itemStatus";
+import { effectiveDueDate, effectiveOwnerLabel, hasProposal, signedAtFor } from "@/lib/itemStatus";
 import { formatDateTime } from "@/lib/format";
 import CategoryBadge from "../CategoryBadge";
 
@@ -87,7 +87,12 @@ export default function CountersignedRecord({
                   <span className="text-xs font-medium text-navy/30">#{idx + 1}</span>
                   <CategoryBadge category={item.category} />
                 </div>
-                <p className="mb-2 text-sm font-medium text-navy">{item.text}</p>
+                <p className="mb-1 text-sm font-medium text-navy">{status ? status.aText : item.text}</p>
+                {status && hasProposal(status) && (
+                  <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-gold-dark">
+                    Resolved from ambiguity
+                  </p>
+                )}
                 <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-navy/50">
                   <span>
                     {orgA} signed {aAt ? formatDateTime(aAt) : "—"}
