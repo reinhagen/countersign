@@ -36,3 +36,19 @@ button {
   outline: 2px solid #b8975a;
   outline-offset: 2px;
 }
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  body {
+    background: white;
+  }
+
+  #record-print-area {
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+  }
+}

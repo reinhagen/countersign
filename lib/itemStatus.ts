@@ -1,4 +1,4 @@
-import { AgreementItem, ItemStatus, Side } from "./types";
+import { AgreementItem, ItemStatus, Side, SoftAskDecision } from "./types";
 
 export function initialStatusFor(item: AgreementItem): ItemStatus {
   const aText = (item.category === "ambiguous" ? item.side_a_version : null) ?? item.text;
@@ -12,6 +12,8 @@ export function initialStatusFor(item: AgreementItem): ItemStatus {
     commitmentOwner: null,
     commitmentDueDate: null,
     done: false,
+    aSignedAt: null,
+    bSignedAt: null,
   };
 }
 
@@ -33,6 +35,52 @@ export function otherSide(side: Side): Side {
 
 export function isConfirmedBy(status: ItemStatus, side: Side): boolean {
   return side === "A" ? status.aConfirmed : status.bConfirmed;
+}
+
+export function signedAtFor(status: ItemStatus, side: Side): number | null {
+  return (side === "A" ? status.aSignedAt : status.bSignedAt) ?? null;
+}
+
+// --- Pure mutators, shared between the local demo-mode reducer and the room action API ---
+
+export function applyConfirm(status: ItemStatus, side: Side): ItemStatus {
+  const now = Date.now();
+  return {
+    ...status,
+    aConfirmed: side === "A" ? true : status.aConfirmed,
+    bConfirmed: side === "B" ? true : status.bConfirmed,
+    aSignedAt: side === "A" ? now : status.aSignedAt,
+    bSignedAt: side === "B" ? now : status.bSignedAt,
+  };
+}
+
+export function applyEdit(status: ItemStatus, side: Side, newText: string): ItemStatus {
+  return {
+    ...status,
+    aText: side === "A" ? newText : status.aText,
+    bText: side === "B" ? newText : status.bText,
+    aConfirmed: side === "A" ? false : status.aConfirmed,
+    bConfirmed: side === "B" ? false : status.bConfirmed,
+    aSignedAt: side === "A" ? null : status.aSignedAt,
+    bSignedAt: side === "B" ? null : status.bSignedAt,
+  };
+}
+
+export function applySoftAskDecision(
+  status: ItemStatus,
+  decision: SoftAskDecision,
+  raisedBy: Side | null | undefined
+): ItemStatus {
+  const commitmentOwner = decision === "request" && raisedBy ? otherSide(raisedBy) : null;
+  return { ...status, softAskDecision: decision, commitmentOwner };
+}
+
+export function applySetCommitmentDueDate(status: ItemStatus, dueDate: string): ItemStatus {
+  return { ...status, commitmentDueDate: dueDate || null };
+}
+
+export function applyToggleDone(status: ItemStatus): ItemStatus {
+  return { ...status, done: !status.done };
 }
 
 /** Best-effort match of a free-text owner string (e.g. "Priya (Wildframe)") to a side. */
